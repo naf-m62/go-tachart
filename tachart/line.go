@@ -17,6 +17,9 @@ type line struct {
 }
 
 func NewLine(name string, vals []float64) Indicator {
+	if !checkNoZeroVals(vals) {
+		return nil
+	}
 	return &line{
 		nms:     []string{name},
 		valsArr: [][]float64{vals},
@@ -26,6 +29,9 @@ func NewLine(name string, vals []float64) Indicator {
 }
 
 func NewLine2(n0 string, vals0 []float64, n1 string, vals1 []float64) Indicator {
+	if !checkNoZeroVals(vals0) || !checkNoZeroVals(vals1) {
+		return nil
+	}
 	return &line{
 		nms:     []string{n0, n1},
 		valsArr: [][]float64{vals0, vals1},
@@ -35,6 +41,9 @@ func NewLine2(n0 string, vals0 []float64, n1 string, vals1 []float64) Indicator 
 }
 
 func NewLine3(n0 string, vals0 []float64, n1 string, vals1 []float64, n2 string, vals2 []float64) Indicator {
+	if !checkNoZeroVals(vals0) || !checkNoZeroVals(vals1) || !checkNoZeroVals(vals2) {
+		return nil
+	}
 	return &line{
 		nms:     []string{n0, n1, n2},
 		valsArr: [][]float64{vals0, vals1, vals2},
@@ -69,7 +78,7 @@ func (b *line) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 	for i, nm := range b.nms {
 		tls = append(tls, opts.Title{
 			TitleStyle: &opts.TextStyle{
-				Color:    colors[b.ci+i],
+				Color:    getColor(b.ci+i),
 				FontSize: chartLabelFontSize,
 			},
 			Title: nm,
@@ -83,6 +92,10 @@ func (b *line) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 func (b line) genChart(_, _, _, _, _ []float64, xAxis interface{}, gridIndex int) charts.Overlaper {
 	lineItems := []opts.LineData{}
 	for _, v := range b.valsArr[0] {
+		if v == 0 {
+			lineItems = append(lineItems, opts.LineData{})
+			continue
+		}
 		lineItems = append(lineItems, opts.LineData{Value: v})
 	}
 
@@ -96,7 +109,7 @@ func (b line) genChart(_, _, _, _, _ []float64, xAxis interface{}, gridIndex int
 				ZLevel:     100,
 			}),
 			charts.WithLineStyleOpts(opts.LineStyle{
-				Color:   colors[b.ci],
+				Color:   getColor(b.ci),
 				Opacity: opacityMed,
 			}),
 			charts.WithMarkLineStyleOpts(
@@ -113,6 +126,10 @@ func (b line) genChart(_, _, _, _, _ []float64, xAxis interface{}, gridIndex int
 	for i := 1; i < len(b.nms); i++ {
 		lineItems := []opts.LineData{}
 		for _, v := range b.valsArr[i] {
+			if v == 0 {
+				lineItems = append(lineItems, opts.LineData{})
+				continue
+			}
 			lineItems = append(lineItems, opts.LineData{Value: v})
 		}
 
@@ -126,7 +143,7 @@ func (b line) genChart(_, _, _, _, _ []float64, xAxis interface{}, gridIndex int
 					ZLevel:     100,
 				}),
 				charts.WithLineStyleOpts(opts.LineStyle{
-					Color:   colors[b.ci+i],
+					Color:   getColor(b.ci),
 					Opacity: opacityMed,
 				}),
 				charts.WithMarkLineStyleOpts(
@@ -144,3 +161,18 @@ func (b line) genChart(_, _, _, _, _ []float64, xAxis interface{}, gridIndex int
 
 	return c
 }
+
+// calcVals implements Indicator.
+func (b *line) calcVals(vals []float64) {
+	panic("unimplemented")
+}
+
+func checkNoZeroVals(vals []float64) bool {
+	for _, v := range vals {
+		if v != 0 {
+			return true
+		}
+	}
+	return false
+}
+	

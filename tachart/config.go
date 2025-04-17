@@ -43,7 +43,7 @@ type Config struct {
 
 func NewConfig() *Config {
 	return &Config{
-		precision:  2,
+		precision:  3,
 		overlays:   []Indicator{},
 		indicators: []Indicator{},
 		assetsHost: "https://go-echarts.github.io/go-echarts-assets/assets/",

@@ -49,7 +49,7 @@ func (a *atr) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 	return []opts.Title{
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
-				Color:    colors[a.ci],
+				Color:    getColor(a.ci),
 				FontSize: chartLabelFontSize,
 			},
 			Title: a.nm,
@@ -81,7 +81,12 @@ func (a atr) genChart(_, highs, lows, closes, _ []float64, xAxis interface{}, gr
 				ZLevel:     100,
 			}),
 			charts.WithLineStyleOpts(opts.LineStyle{
-				Color:   colors[a.ci],
+				Color:   getColor(a.ci),
 				Opacity: opacityMed,
 			}))
+}
+
+// calcVals implements Indicator. Need for cal yMin and yMax
+func (a *atr) calcVals(vals []float64) {
+	panic("unimplemented")
 }

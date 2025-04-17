@@ -54,7 +54,7 @@ func (b *boundedLine) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 	return []opts.Title{
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
-				Color:    colors[b.ci],
+				Color:    getColor(b.ci),
 				FontSize: chartLabelFontSize,
 			},
 			Title: b.nm,
@@ -80,7 +80,7 @@ func (b boundedLine) genChart(_, _, _, _, _ []float64, xAxis interface{}, gridIn
 				ZLevel:     100,
 			}),
 			charts.WithLineStyleOpts(opts.LineStyle{
-				Color:   colors[b.ci],
+				Color:   getColor(b.ci),
 				Opacity: opacityMed,
 			}),
 			charts.WithMarkLineNameYAxisItemOpts(
@@ -103,4 +103,9 @@ func (b boundedLine) genChart(_, _, _, _, _ []float64, xAxis interface{}, gridIn
 				},
 			),
 		)
+}
+
+// calcVals implements Indicator. Need for cal yMin and yMax
+func (b *boundedLine) calcVals(vals []float64) {
+	panic("unimplemented")
 }

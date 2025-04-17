@@ -60,7 +60,7 @@ func (b *bbands) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 	return []opts.Title{
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
-				Color:    colors[b.ci],
+				Color:    getColor(b.ci),
 				FontSize: chartLabelFontSize,
 			},
 			Title: b.nm + "-Ma",
@@ -69,7 +69,7 @@ func (b *bbands) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 		},
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
-				Color:    colors[b.ci+1],
+				Color:    getColor(b.ci+1),
 				FontSize: chartLabelFontSize,
 			},
 			Title: b.nm + "-Upper",
@@ -78,7 +78,7 @@ func (b *bbands) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 		},
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
-				Color:    colors[b.ci+1],
+				Color:    getColor(b.ci+1),
 				FontSize: chartLabelFontSize,
 			},
 			Title: b.nm + "-Lower",
@@ -115,7 +115,7 @@ func (b bbands) genChart(_, _, _, closes, _ []float64, xAxis interface{}, gridIn
 				ZLevel:     100,
 			}),
 			charts.WithLineStyleOpts(opts.LineStyle{
-				Color:   colors[b.ci],
+				Color:   getColor(b.ci),
 				Opacity: opacityMed,
 			}))
 	ul := charts.NewLine().
@@ -128,7 +128,7 @@ func (b bbands) genChart(_, _, _, closes, _ []float64, xAxis interface{}, gridIn
 				ZLevel:     100,
 			}),
 			charts.WithLineStyleOpts(opts.LineStyle{
-				Color:   colors[b.ci+1],
+				Color:   getColor(b.ci+1),
 				Opacity: opacityMed,
 			}))
 	ll := charts.NewLine().
@@ -141,10 +141,15 @@ func (b bbands) genChart(_, _, _, closes, _ []float64, xAxis interface{}, gridIn
 				ZLevel:     100,
 			}),
 			charts.WithLineStyleOpts(opts.LineStyle{
-				Color:   colors[b.ci+1],
+				Color:   getColor(b.ci+1),
 				Opacity: opacityMed,
 			}))
 
 	ml.Overlap(ul, ll)
 	return ml
+}
+
+// calcVals implements Indicator. Need for cal yMin and yMax
+func (b *bbands) calcVals(vals []float64) {
+	panic("unimplemented")
 }

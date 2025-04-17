@@ -1,8 +1,8 @@
 package tachart
 
 const (
-	colorUpBar   = "#00DA3C"
-	colorDownBar = "#EC0000"
+	colorUpBar   = "#4A725B"
+	colorDownBar = "#953A2E"
 	opacityHeavy = 0.7
 	opacityMed   = 0.5
 	opacityLight = 0.3
@@ -28,3 +28,10 @@ var (
 		"#000080", // navy
 	}
 )
+
+func getColor(index int) string {
+	if index < len(colors) {
+		return colors[index]
+	}
+	return colors[index%len(colors)]
+}

@@ -16,6 +16,7 @@ type macd struct {
 	slow   int64
 	signal int64
 	ci     int
+	macd, signalv, hist   []float64
 }
 
 func NewMACD(fast, slow, signal int) Indicator {
@@ -36,15 +37,45 @@ func (c macd) yAxisLabel() string {
 }
 
 func (c macd) yAxisMin() string {
-	return strings.Replace(minRoundFuncTpl, "__DECIMAL_PLACES__", "0", -1)
+	// looking for min value from signalv
+	minVal := c.signalv[0]
+	for _, v := range c.signalv {
+		if v < minVal {
+			minVal = v
+		}
+	}
+	minVal *= 1.1
+	return fmt.Sprintf(`function(value) { return %v }`, minVal)
 }
 
 func (c macd) yAxisMax() string {
-	return strings.Replace(maxRoundFuncTpl, "__DECIMAL_PLACES__", "0", -1)
+	// looking for max value from signalv
+	maxVal := c.signalv[0]
+	for _, v := range c.signalv {
+		if v > maxVal {
+			maxVal = v
+		}
+	}
+	maxVal *= 1.1
+	return fmt.Sprintf(`function(value) { return %v }`, maxVal)
 }
 
 func (c macd) getNumColors() int {
 	return 2
+}
+
+func (c *macd) calcVals(closes []float64) {
+	c.macd, c.signalv, c.hist = tart.MacdArr(closes, c.fast, c.slow, c.signal)
+	// умножаем на 100
+	for i := range c.macd {
+		c.macd[i] *= 100
+	}
+	for i := range c.signalv {
+		c.signalv[i] *= 100
+	}
+	for i := range c.hist {
+		c.hist[i] *= 100
+	}
 }
 
 func (c *macd) getTitleOpts(top, left int, colorIndex int) []opts.Title {
@@ -52,7 +83,7 @@ func (c *macd) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 	return []opts.Title{
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
-				Color:    colors[c.ci],
+				Color:    getColor(c.ci),
 				FontSize: chartLabelFontSize,
 			},
 			Title: c.nm + "-Diff",
@@ -61,7 +92,7 @@ func (c *macd) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 		},
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
-				Color:    colors[c.ci+1],
+				Color:    getColor(c.ci+1),
 				FontSize: chartLabelFontSize,
 			},
 			Title: c.nm + "-Sig",
@@ -72,7 +103,11 @@ func (c *macd) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 }
 
 func (c macd) genChart(_, _, _, closes, _ []float64, xAxis interface{}, gridIndex int) charts.Overlaper {
-	macd, signal, hist := tart.MacdArr(closes, c.fast, c.slow, c.signal)
+	macd, signal, hist := c.macd, c.signalv, c.hist
+
+	// macd = macd[c.countExtraCandles()-1:]
+	// hist = hist[c.countExtraCandles()-1:]
+	// signal = signal[c.countExtraCandles()-1:]
 
 	lineItems := []opts.LineData{}
 	for _, v := range macd {
@@ -88,7 +123,7 @@ func (c macd) genChart(_, _, _, closes, _ []float64, xAxis interface{}, gridInde
 				ZLevel:     100,
 			}),
 			charts.WithLineStyleOpts(opts.LineStyle{
-				Color:   colors[c.ci],
+				Color:   getColor(c.ci),
 				Opacity: opacityMed,
 			}),
 		)
@@ -107,7 +142,7 @@ func (c macd) genChart(_, _, _, closes, _ []float64, xAxis interface{}, gridInde
 				ZLevel:     100,
 			}),
 			charts.WithLineStyleOpts(opts.LineStyle{
-				Color:   colors[c.ci+1],
+				Color:   getColor(c.ci+1),
 				Opacity: opacityMed,
 			}),
 		)

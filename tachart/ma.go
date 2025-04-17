@@ -57,7 +57,7 @@ func (c *ma) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 	return []opts.Title{
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
-				Color:    colors[c.ci],
+				Color:    getColor(c.ci),
 				FontSize: chartLabelFontSize,
 			},
 			Title: c.nm,
@@ -68,13 +68,23 @@ func (c *ma) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 }
 
 func (c ma) genChart(_, _, _, closes, _ []float64, xAxis interface{}, gridIndex int) charts.Overlaper {
+	// check len
+	if len(closes) < int(c.n) {
+		return charts.NewLine()
+	}
 	ma := c.fn(closes, c.n)
 	for i := 0; i < int(c.n); i++ {
 		ma[i] = ma[c.n]
 	}
 
+	// ma = ma[c.countExtraCandles()-1:]
+
 	items := []opts.LineData{}
-	for _, v := range ma {
+	for i, v := range ma {
+		if i < int(c.n) {
+			items = append(items, opts.LineData{})
+			continue
+		}
 		items = append(items, opts.LineData{Value: v})
 	}
 
@@ -88,7 +98,12 @@ func (c ma) genChart(_, _, _, closes, _ []float64, xAxis interface{}, gridIndex 
 				ZLevel:     100,
 			}),
 			charts.WithLineStyleOpts(opts.LineStyle{
-				Color:   colors[c.ci],
+				Color:   getColor(c.ci),
 				Opacity: opacityMed,
 			}))
+}
+
+// calcVals implements Indicator. Need for cal yMin and yMax
+func (c *ma) calcVals(vals []float64) {
+	panic("unimplemented")
 }

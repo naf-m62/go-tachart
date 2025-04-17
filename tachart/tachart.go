@@ -80,9 +80,9 @@ var (
 	left = 80
 	// right margin
 	right   = 40
-	sliderH = 85
+	sliderH = 80
 	// vertical gap between charts
-	gap = 20
+	gap = 15
 )
 
 type gridLayout struct {
@@ -101,7 +101,7 @@ type TAChart struct {
 	gridLayouts    []gridLayout
 }
 
-func New(cfg Config) *TAChart {
+func New(cfg Config, cdls []Candle) *TAChart {
 	decimalPlaces := fmt.Sprintf("%v", cfg.precision)
 	minRoundFunc := strings.Replace(minRoundFuncTpl, "__DECIMAL_PLACES__", decimalPlaces, -1)
 	maxRoundFunc := strings.Replace(maxRoundFuncTpl, "__DECIMAL_PLACES__", decimalPlaces, -1)
@@ -126,7 +126,9 @@ func New(cfg Config) *TAChart {
 	//   		  volume chart                (h/2/N)
 	// ----------------------------------------
 
-	h := (cfg.layout.chartHeight - sliderH) / (len(cfg.indicators) + 1 + 2)
+	separator := 4
+
+	h := (cfg.layout.chartHeight - sliderH) / (len(cfg.indicators) + 1 + separator)
 	// candlestick+overlay
 	cdlChartTop := 20
 	// event
@@ -138,7 +140,7 @@ func New(cfg Config) *TAChart {
 			Left:   px(left),
 			Right:  px(right),
 			Top:    px(cdlChartTop),
-			Height: px(h * 2),
+			Height: px(h * separator),
 		},
 		opts.Grid{ // event
 			Left:   px(left),
@@ -152,7 +154,7 @@ func New(cfg Config) *TAChart {
 			top:  cdlChartTop,
 			left: left,
 			w:    right - left,
-			h:    h * 2,
+			h:    h * separator,
 		},
 		gridLayout{
 			top:  eventChartTop,
@@ -176,7 +178,7 @@ func New(cfg Config) *TAChart {
 	}
 
 	// indicator & vol chart, inddex starting from 2
-	top := cdlChartTop + h*2 + gap*2
+	top := cdlChartTop + h*separator + gap*2
 	for i := 0; i < len(cfg.indicators)+1; i++ {
 		gridIndex := i + 2
 		grids = append(grids, opts.Grid{
@@ -220,6 +222,11 @@ func New(cfg Config) *TAChart {
 			if v != "" {
 				indYLabelFormatterFunc = v
 			}
+			closes := []float64{}
+			for _, cdl := range cdls {
+				closes = append(closes, cdl.C)
+			}
+			cfg.indicators[i].calcVals(closes)
 			v = cfg.indicators[i].yAxisMin()
 			if v != "" {
 				min = v
@@ -292,14 +299,14 @@ func New(cfg Config) *TAChart {
 				Formatter:    opts.FuncOpts(yLabelFormatterFunc),
 			},
 		},
-		dataZooms: []opts.DataZoom{
-			opts.DataZoom{
-				Type:       "slider",
-				Start:      50,
-				End:        100,
-				XAxisIndex: xAxisIndex,
-			},
-		},
+		// dataZooms: []opts.DataZoom{
+		// 	opts.DataZoom{
+		// 		Type:       "slider",
+		// 		Start:      50,
+		// 		End:        100,
+		// 		XAxisIndex: xAxisIndex,
+		// 	},
+		// },
 	}
 	if cfg.draggable {
 		globalOptsData.dataZooms = append(globalOptsData.dataZooms,
@@ -315,6 +322,9 @@ func New(cfg Config) *TAChart {
 	top = layout.top - 5
 	ci := 0
 	for _, ol := range cfg.overlays {
+		if ol == nil {
+			continue
+		}
 		globalOptsData.titles = append(globalOptsData.titles, ol.getTitleOpts(top, layout.left+5, ci)...)
 		top += chartLabelFontHeight
 		ci += ol.getNumColors()
@@ -409,6 +419,9 @@ func (c TAChart) GenStatic(cdls []Candle, events []Event, path string) error {
 	chart.SetGlobalOptions(c.globalOptsData.genOpts(c.cfg, len(cdls), eventDescMap)...)
 
 	for _, ol := range c.cfg.overlays {
+		if ol == nil {
+			continue
+		}
 		chart.Overlap(ol.genChart(opens, highs, lows, closes, vols, xAxis, 0))
 	}
 

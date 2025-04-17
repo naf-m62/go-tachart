@@ -180,6 +180,6 @@ bottom bar
 		).
 		UseRepoAssets() // serving assets file from current repo, avoid network access
 
-	c := tachart.New(*cfg)
+	c := tachart.New(*cfg, cdls)
 	c.GenStatic(cdls, events, "/Volumes/tmpfs/tmp/kline.html")
 }

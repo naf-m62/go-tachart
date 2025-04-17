@@ -25,4 +25,6 @@ type Indicator interface {
 	getTitleOpts(top, left int, colorIndex int) []opts.Title
 	// indicator chart config
 	genChart(opens, highs, lows, closes, vols []float64, xAxis interface{}, gridIndex int) charts.Overlaper
+	// calculate indicator values
+	calcVals(vals []float64)
 }

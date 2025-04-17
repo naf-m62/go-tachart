@@ -48,7 +48,7 @@ func (b *bar) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 	return []opts.Title{
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
-				Color:    colors[b.ci],
+				Color:    getColor(b.ci),
 				FontSize: chartLabelFontSize,
 			},
 			Title: b.nm,
@@ -62,7 +62,7 @@ func (b bar) genChart(_, _, _, _, _ []float64, xAxis interface{}, gridIndex int)
 	barItems := []opts.BarData{}
 	for _, v := range b.vals {
 		style := &opts.ItemStyle{
-			Color:   colors[b.ci],
+			Color:   getColor(b.ci),
 			Opacity: opacityHeavy,
 		}
 		barItems = append(barItems, opts.BarData{Value: v, ItemStyle: style})
@@ -75,4 +75,9 @@ func (b bar) genChart(_, _, _, _, _ []float64, xAxis interface{}, gridIndex int)
 			YAxisIndex: gridIndex,
 			ZLevel:     100,
 		}))
+}
+
+// calcVals implements Indicator. Need for cal yMin and yMax
+func (b *bar) calcVals(vals []float64) {
+	panic("unimplemented")
 }

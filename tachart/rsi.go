@@ -16,6 +16,7 @@ type rsi struct {
 	oversold   float64
 	overbought float64
 	ci         int
+	vals       []float64
 }
 
 func NewRSI(n int, oversold, overbought float64) Indicator {
@@ -36,11 +37,39 @@ func (r rsi) yAxisLabel() string {
 }
 
 func (r rsi) yAxisMin() string {
-	return `function(value) { return 0 }`
+	// get min value from vals[r.n:]
+	if len(r.vals) < int(r.n) {
+		return fmt.Sprintf(`function(value) { return %v }`, 0)
+	}
+	minVal := 100.0
+	for _, v := range r.vals[r.n:] {
+		if v < minVal {
+			minVal = v
+		}
+	}
+	minVal = minVal - 10
+	if minVal < 0 {
+		minVal = 0
+	}
+	return fmt.Sprintf(`function(value) { return %v }`, minVal)
 }
 
 func (r rsi) yAxisMax() string {
-	return `function(value) { return 100 }`
+	// get max value from vals[r.n:]
+	if len(r.vals) < int(r.n) {
+		return fmt.Sprintf(`function(value) { return %v }`, 100)
+	}
+	maxVal := 0.0
+	for _, v := range r.vals[r.n:] {
+		if v > maxVal {
+			maxVal = v
+		}
+	}
+	maxVal = maxVal + 10
+	if maxVal > 100 {
+		maxVal = 100
+	}
+	return fmt.Sprintf(`function(value) { return %v }`, maxVal)
 }
 
 func (r rsi) getNumColors() int {
@@ -52,7 +81,7 @@ func (r *rsi) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 	return []opts.Title{
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
-				Color:    colors[r.ci],
+				Color:    getColor(r.ci),
 				FontSize: chartLabelFontSize,
 			},
 			Title: r.nm,
@@ -62,8 +91,14 @@ func (r *rsi) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 	}
 }
 
+func (r *rsi) calcVals(closes []float64) {
+	r.vals = tart.RsiArr(closes, r.n)
+}
+
 func (r rsi) genChart(_, _, _, closes, _ []float64, xAxis interface{}, gridIndex int) charts.Overlaper {
-	vals := tart.RsiArr(closes, r.n)
+	vals := r.vals
+
+	// vals = vals[r.countExtraCandles()-1:]
 
 	lineItems := []opts.LineData{}
 	for _, v := range vals {
@@ -80,7 +115,7 @@ func (r rsi) genChart(_, _, _, closes, _ []float64, xAxis interface{}, gridIndex
 				ZLevel:     100,
 			}),
 			charts.WithLineStyleOpts(opts.LineStyle{
-				Color:   colors[r.ci],
+				Color:   getColor(r.ci),
 				Opacity: opacityMed,
 			}),
 			charts.WithMarkLineNameYAxisItemOpts(
