@@ -3,7 +3,7 @@ package tachart
 import (
 	"fmt"
 
-	"github.com/iamjinlei/go-tachart/opts"
+	"github.com/naf-m62/go-tachart/opts"
 )
 
 const (

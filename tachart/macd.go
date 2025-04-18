@@ -6,17 +6,17 @@ import (
 
 	"github.com/iamjinlei/go-tart"
 
-	"github.com/iamjinlei/go-tachart/charts"
-	"github.com/iamjinlei/go-tachart/opts"
+	"github.com/naf-m62/go-tachart/charts"
+	"github.com/naf-m62/go-tachart/opts"
 )
 
 type macd struct {
-	nm     string
-	fast   int64
-	slow   int64
-	signal int64
-	ci     int
-	macd, signalv, hist   []float64
+	nm                  string
+	fast                int64
+	slow                int64
+	signal              int64
+	ci                  int
+	macd, signalv, hist []float64
 }
 
 func NewMACD(fast, slow, signal int) Indicator {
@@ -92,7 +92,7 @@ func (c *macd) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 		},
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
-				Color:    getColor(c.ci+1),
+				Color:    getColor(c.ci + 1),
 				FontSize: chartLabelFontSize,
 			},
 			Title: c.nm + "-Sig",
@@ -142,7 +142,7 @@ func (c macd) genChart(_, _, _, closes, _ []float64, xAxis interface{}, gridInde
 				ZLevel:     100,
 			}),
 			charts.WithLineStyleOpts(opts.LineStyle{
-				Color:   getColor(c.ci+1),
+				Color:   getColor(c.ci + 1),
 				Opacity: opacityMed,
 			}),
 		)

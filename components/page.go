@@ -1,8 +1,8 @@
 package components
 
 import (
-	"github.com/iamjinlei/go-tachart/opts"
-	"github.com/iamjinlei/go-tachart/render"
+	"github.com/naf-m62/go-tachart/opts"
+	"github.com/naf-m62/go-tachart/render"
 )
 
 // Charter

@@ -1,4 +1,4 @@
-module github.com/iamjinlei/go-tachart
+module github.com/naf-m62/go-tachart
 
 go 1.24
 

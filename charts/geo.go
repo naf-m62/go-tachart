@@ -3,10 +3,10 @@ package charts
 import (
 	"log"
 
-	"github.com/iamjinlei/go-tachart/datasets"
-	"github.com/iamjinlei/go-tachart/opts"
-	"github.com/iamjinlei/go-tachart/render"
-	"github.com/iamjinlei/go-tachart/types"
+	"github.com/naf-m62/go-tachart/datasets"
+	"github.com/naf-m62/go-tachart/opts"
+	"github.com/naf-m62/go-tachart/render"
+	"github.com/naf-m62/go-tachart/types"
 )
 
 // Geo represents a geo chart.

@@ -5,8 +5,8 @@ import (
 
 	"github.com/iamjinlei/go-tart"
 
-	"github.com/iamjinlei/go-tachart/charts"
-	"github.com/iamjinlei/go-tachart/opts"
+	"github.com/naf-m62/go-tachart/charts"
+	"github.com/naf-m62/go-tachart/opts"
 )
 
 type ma struct {

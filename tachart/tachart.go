@@ -7,9 +7,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/iamjinlei/go-tachart/charts"
-	"github.com/iamjinlei/go-tachart/components"
-	"github.com/iamjinlei/go-tachart/opts"
+	"github.com/naf-m62/go-tachart/charts"
+	"github.com/naf-m62/go-tachart/components"
+	"github.com/naf-m62/go-tachart/opts"
 )
 
 const (

@@ -1,6 +1,6 @@
 package charts
 
-import "github.com/iamjinlei/go-tachart/opts"
+import "github.com/naf-m62/go-tachart/opts"
 
 type SingleSeries struct {
 	Name   string `json:"name,omitempty"`
@@ -390,7 +390,9 @@ type MultiSeries []SingleSeries
 // SetSeriesOptions sets options for all the series.
 // Previous options will be overwrote every time hence setting them on the `AddSeries` if you want
 // to customize each series individually
-// 															 here -> ↓ <-
+//
+//	here -> ↓ <-
+//
 // func (c *Bar) AddSeries(name string, data []opts.BarData, options ...SeriesOpts)
 func (ms *MultiSeries) SetSeriesOptions(opts ...SeriesOpts) {
 	s := *ms

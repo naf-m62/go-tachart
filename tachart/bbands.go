@@ -5,8 +5,8 @@ import (
 
 	"github.com/iamjinlei/go-tart"
 
-	"github.com/iamjinlei/go-tachart/charts"
-	"github.com/iamjinlei/go-tachart/opts"
+	"github.com/naf-m62/go-tachart/charts"
+	"github.com/naf-m62/go-tachart/opts"
 )
 
 type bbands struct {
@@ -69,7 +69,7 @@ func (b *bbands) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 		},
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
-				Color:    getColor(b.ci+1),
+				Color:    getColor(b.ci + 1),
 				FontSize: chartLabelFontSize,
 			},
 			Title: b.nm + "-Upper",
@@ -78,7 +78,7 @@ func (b *bbands) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 		},
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
-				Color:    getColor(b.ci+1),
+				Color:    getColor(b.ci + 1),
 				FontSize: chartLabelFontSize,
 			},
 			Title: b.nm + "-Lower",
@@ -128,7 +128,7 @@ func (b bbands) genChart(_, _, _, closes, _ []float64, xAxis interface{}, gridIn
 				ZLevel:     100,
 			}),
 			charts.WithLineStyleOpts(opts.LineStyle{
-				Color:   getColor(b.ci+1),
+				Color:   getColor(b.ci + 1),
 				Opacity: opacityMed,
 			}))
 	ll := charts.NewLine().
@@ -141,7 +141,7 @@ func (b bbands) genChart(_, _, _, closes, _ []float64, xAxis interface{}, gridIn
 				ZLevel:     100,
 			}),
 			charts.WithLineStyleOpts(opts.LineStyle{
-				Color:   getColor(b.ci+1),
+				Color:   getColor(b.ci + 1),
 				Opacity: opacityMed,
 			}))
 

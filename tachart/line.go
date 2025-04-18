@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/iamjinlei/go-tachart/charts"
-	"github.com/iamjinlei/go-tachart/opts"
+	"github.com/naf-m62/go-tachart/charts"
+	"github.com/naf-m62/go-tachart/opts"
 )
 
 type line struct {
@@ -78,7 +78,7 @@ func (b *line) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 	for i, nm := range b.nms {
 		tls = append(tls, opts.Title{
 			TitleStyle: &opts.TextStyle{
-				Color:    getColor(b.ci+i),
+				Color:    getColor(b.ci + i),
 				FontSize: chartLabelFontSize,
 			},
 			Title: nm,
@@ -175,4 +175,3 @@ func checkNoZeroVals(vals []float64) bool {
 	}
 	return false
 }
-	
