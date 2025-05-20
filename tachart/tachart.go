@@ -1,10 +1,12 @@
 package tachart
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"html/template"
 	"image/color"
+	"image/png"
 	"math"
 	"os"
 	"strings"
@@ -353,8 +355,8 @@ func New(cfg Config, cdls []Candle) *TAChart {
 	}
 }
 
-// GenImage generates and saves chart as a PNG image
-func (c TAChart) GenImage(cdls []Candle, events []Event, path string) error {
+// GenImage generates and returns chart as a PNG image byte slice
+func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 	// Создаем холст изображения с размерами, соответствующими размерам графика
 	width := c.cfg.layout.chartWidth
 	height := c.cfg.layout.chartHeight
@@ -510,23 +512,23 @@ func (c TAChart) GenImage(cdls []Candle, events []Event, path string) error {
 			for i := 0; i < len(vals) && i < len(cdls); i++ {
 				var lastValidX, lastValidY float64
 				var hasLastValid bool
-				
+
 				// Проходим по всем точкам линии
 				for j := 0; j < len(vals[i]); j++ {
 					// Текущая координата X
 					x := leftMargin + float64(j)*candleWidth + candleWidth/2.0
-					
+
 					// Проверяем, является ли текущее значение действительным (не NaN)
 					value := vals[i][j]
 					if !math.IsNaN(value) {
 						// Рассчитываем координату Y для действительного значения
 						y := mapValueToCanvas(value, min, max, canvasHeight) + candleChartTop
-						
+
 						// Если есть предыдущая действительная точка, соединяем с ней линией
 						if hasLastValid {
 							dc.DrawLine(lastValidX, lastValidY, x, y)
 						}
-						
+
 						// Запоминаем эту точку как последнюю действительную
 						lastValidX = x
 						lastValidY = y
@@ -882,8 +884,13 @@ func (c TAChart) GenImage(cdls []Candle, events []Event, path string) error {
 		dc.Fill()
 	}
 
-	// Сохраняем изображение
-	return dc.SavePNG(path)
+	// Возвращаем изображение как слайс байтов
+	buf := bytes.NewBuffer(nil)
+	err := png.Encode(buf, dc.Image())
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 // parseHexColor парсит HTML-цветовой код в color.RGBA
