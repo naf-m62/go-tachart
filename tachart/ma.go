@@ -2,6 +2,7 @@ package tachart
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/iamjinlei/go-tart"
 
@@ -16,19 +17,21 @@ type ma struct {
 	ci int
 }
 
-func NewSMA(n int) Indicator {
+func NewSMA(n int, color int) Indicator {
 	return &ma{
 		nm: fmt.Sprintf("SMA(%v)", n),
 		n:  int64(n),
 		fn: tart.SmaArr,
+		ci: color,
 	}
 }
 
-func NewEMA(n int) Indicator {
+func NewEMA(n int, color int) Indicator {
 	return &ma{
 		nm: fmt.Sprintf("EMA(%v)", n),
 		n:  int64(n),
 		fn: tart.EmaArr,
+		ci: color,
 	}
 }
 
@@ -48,12 +51,29 @@ func (c ma) yAxisMax() string {
 	return ""
 }
 
-func (c ma) getNumColors() int {
-	return 1
+func (c ma) getColor() int {
+	return c.ci
 }
 
-func (c *ma) getTitleOpts(top, left int, colorIndex int) []opts.Title {
-	c.ci = colorIndex
+func (c *ma) calcVals(closes []float64) [][]float64 {
+	// Проверяем длину массива
+	if len(closes) < int(c.n) {
+		return [][]float64{}
+	}
+
+	ma := c.fn(closes, c.n)
+	for i := 0; i < int(c.n); i++ {
+		ma[i] = math.NaN()
+	}
+
+	return [][]float64{ma}
+}
+
+func (c ma) getDrawType() string {
+	return "line"
+}
+
+func (c *ma) getTitleOpts(top, left int) []opts.Title {
 	return []opts.Title{
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
@@ -101,9 +121,4 @@ func (c ma) genChart(_, _, _, closes, _ []float64, xAxis interface{}, gridIndex 
 				Color:   getColor(c.ci),
 				Opacity: opacityMed,
 			}))
-}
-
-// calcVals implements Indicator. Need for cal yMin and yMax
-func (c *ma) calcVals(vals []float64) {
-	panic("unimplemented")
 }

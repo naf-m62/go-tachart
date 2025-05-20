@@ -4,9 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"image/color"
+	"math"
 	"os"
 	"strings"
 
+	"github.com/fogleman/gg"
 	"github.com/naf-m62/go-tachart/charts"
 	"github.com/naf-m62/go-tachart/components"
 	"github.com/naf-m62/go-tachart/opts"
@@ -320,18 +323,16 @@ func New(cfg Config, cdls []Candle) *TAChart {
 
 	layout := gridLayouts[0]
 	top = layout.top - 5
-	ci := 0
 	for _, ol := range cfg.overlays {
 		if ol == nil {
 			continue
 		}
-		globalOptsData.titles = append(globalOptsData.titles, ol.getTitleOpts(top, layout.left+5, ci)...)
+		globalOptsData.titles = append(globalOptsData.titles, ol.getTitleOpts(top, layout.left+5)...)
 		top += chartLabelFontHeight
-		ci += ol.getNumColors()
 	}
 	for i, ind := range cfg.indicators {
 		layout := gridLayouts[i+2]
-		globalOptsData.titles = append(globalOptsData.titles, ind.getTitleOpts(layout.top-5, layout.left+5, 0)...)
+		globalOptsData.titles = append(globalOptsData.titles, ind.getTitleOpts(layout.top-5, layout.left+5)...)
 	}
 	layout = gridLayouts[len(gridLayouts)-1]
 	globalOptsData.titles = append(globalOptsData.titles, opts.Title{
@@ -350,6 +351,587 @@ func New(cfg Config, cdls []Candle) *TAChart {
 		extendedYAxis:  extendedYAxis,
 		gridLayouts:    gridLayouts,
 	}
+}
+
+// GenImage generates and saves chart as a PNG image
+func (c TAChart) GenImage(cdls []Candle, events []Event, path string) error {
+	// Создаем холст изображения с размерами, соответствующими размерам графика
+	width := c.cfg.layout.chartWidth
+	height := c.cfg.layout.chartHeight
+	dc := gg.NewContext(width, height)
+
+	// Заполняем фон
+	pageBgColor := pageBgColorMap[c.cfg.theme]
+	if pageBgColor == "" {
+		pageBgColor = "#FFFFFF"
+	}
+	bgColor, _ := parseHexColor(pageBgColor)
+	dc.SetColor(bgColor)
+	dc.Clear()
+
+	// Рассчитываем высоты блоков графиков
+	const topMargin = 0.0     // Отступ сверху
+	const bottomMargin = 30.0 // Отступ снизу для дат
+	const leftMargin = 75.0   // Отступ слева для меток оси Y
+	const rightMargin = 25.0  // Отступ справа
+
+	numIndicators := len(c.cfg.indicators) + 1 // volume indicator
+	totalParts := 4 + numIndicators            // 4/7 - свечной график, по 1/7 - каждый индикатор
+	usableHeight := float64(height) - bottomMargin
+	partHeight := usableHeight / float64(totalParts)
+
+	// Размеры свечного графика
+	candleChartHeight := partHeight * 4
+	candleChartTop := topMargin // Отступ сверху
+	candleChartBottom := candleChartTop + candleChartHeight
+
+	// Рисуем свечной график
+	xAxis := make([]string, 0)
+	klineSeries := []opts.KlineData{}
+	opens := []float64{}
+	highs := []float64{}
+	lows := []float64{}
+	closes := []float64{}
+	vols := []float64{}
+	for _, cdl := range cdls {
+		xAxis = append(xAxis, cdl.Label)
+		klineSeries = append(klineSeries, opts.KlineData{Value: []float64{cdl.O, cdl.C, cdl.L, cdl.H}})
+		opens = append(opens, cdl.O)
+		highs = append(highs, cdl.H)
+		lows = append(lows, cdl.L)
+		closes = append(closes, cdl.C)
+		vols = append(vols, cdl.V)
+	}
+
+	// Находим минимум и максимум для масштабирования свечного графика
+	min, max := findMinMax(lows, highs)
+	canvasWidth := float64(width) - 100.0    // Оставляем место для осей
+	canvasHeight := candleChartHeight - 25.0 // Высота свечного графика с учетом отступов
+
+	// Рисуем рамку для свечного графика
+	dc.SetRGB(0, 0, 0)
+	dc.SetLineWidth(1)
+	dc.DrawLine(leftMargin, candleChartTop, leftMargin, candleChartBottom)                    // Вертикальная ось Y
+	dc.DrawLine(leftMargin, candleChartBottom, float64(width)-rightMargin, candleChartBottom) // Горизонтальная ось X
+	dc.Stroke()
+
+	// Рисуем свечи
+	candleWidth := canvasWidth / float64(len(cdls))
+	candleBarWidth := candleWidth * 0.6
+
+	for i, cdl := range cdls {
+		x := leftMargin + float64(i)*candleWidth + candleWidth/2.0
+		// Добавляем отступ сверху к координатам
+		yOpen := mapValueToCanvas(cdl.O, min, max, canvasHeight) + candleChartTop
+		yClose := mapValueToCanvas(cdl.C, min, max, canvasHeight) + candleChartTop
+		yLow := mapValueToCanvas(cdl.L, min, max, canvasHeight) + candleChartTop
+		yHigh := mapValueToCanvas(cdl.H, min, max, canvasHeight) + candleChartTop
+
+		// Рисуем линию от минимума до максимума
+		dc.DrawLine(x, yLow, x, yHigh)
+		dc.Stroke()
+
+		// Рисуем тело свечи
+		if cdl.O > cdl.C {
+			// Медвежья свеча (красная)
+			dc.SetRGB(1, 0, 0)
+		} else {
+			// Бычья свеча (зеленая)
+			dc.SetRGB(0, 1, 0)
+		}
+
+		yBodyTop := yOpen
+		yBodyBottom := yClose
+		if yOpen > yClose {
+			yBodyTop = yClose
+			yBodyBottom = yOpen
+		}
+
+		dc.DrawRectangle(x-candleBarWidth/2.0, yBodyTop, candleBarWidth, yBodyBottom-yBodyTop)
+		dc.Fill()
+
+		// Каждые 10 свечей рисуем метку на оси X
+		if i%10 == 0 && i < len(cdls)-1 {
+			dc.SetRGB(0, 0, 0)
+			dc.DrawString(cdls[i].Label, x, float64(height)-5)
+		}
+	}
+
+	// Рисуем значения на оси Y для свечного графика
+	steps := 5
+	for i := 0; i <= steps; i++ {
+		value := min + (max-min)*float64(i)/float64(steps)
+		y := mapValueToCanvas(value, min, max, canvasHeight)
+		y += candleChartTop // Прибавляем отступ сверху
+		dc.SetRGB(0, 0, 0)
+		dc.DrawStringAnchored(fmt.Sprintf("%.2f", value), leftMargin-5, y, 1.0, 0.5)
+
+		// Рисуем горизонтальные линии сетки
+		dc.SetRGBA(0, 0, 0, 0.2)
+		dc.DrawLine(leftMargin, y, float64(width)-rightMargin, y)
+		dc.Stroke()
+	}
+
+	// Рисуем overlays
+	for _, ol := range c.cfg.overlays {
+		if ol == nil {
+			continue
+		}
+
+		// Получаем значения индикатора
+		vals := ol.calcVals(closes) // Используем closes как базовый набор данных
+		if len(vals) == 0 {
+			continue // Пропускаем, если нет данных
+		}
+
+		// Определяем тип отрисовки
+		drawType := ol.getDrawType()
+
+		// Настраиваем цвет для индикатора
+
+		color, err := parseHexColor(getColor(ol.getColor()))
+		if err != nil {
+			// Цвет по умолчанию - синий
+			dc.SetRGB(0.0, 0.5, 1.0)
+		} else {
+			dc.SetColor(color)
+		}
+
+		// Отрисовываем в зависимости от типа
+		switch drawType {
+		case "line":
+			// Рисуем линию
+			dc.SetLineWidth(1.5) // Делаем линию чуть толще, чем у свечей
+
+			// Находим min и max для индикатора, если нужно масштабирование
+			// В этом примере используем тот же масштаб, что и для свечей
+
+			// Рисуем линию, соединяя действительные точки (не NaN)
+			for i := 0; i < len(vals) && i < len(cdls); i++ {
+				var lastValidX, lastValidY float64
+				var hasLastValid bool
+				
+				// Проходим по всем точкам линии
+				for j := 0; j < len(vals[i]); j++ {
+					// Текущая координата X
+					x := leftMargin + float64(j)*candleWidth + candleWidth/2.0
+					
+					// Проверяем, является ли текущее значение действительным (не NaN)
+					value := vals[i][j]
+					if !math.IsNaN(value) {
+						// Рассчитываем координату Y для действительного значения
+						y := mapValueToCanvas(value, min, max, canvasHeight) + candleChartTop
+						
+						// Если есть предыдущая действительная точка, соединяем с ней линией
+						if hasLastValid {
+							dc.DrawLine(lastValidX, lastValidY, x, y)
+						}
+						
+						// Запоминаем эту точку как последнюю действительную
+						lastValidX = x
+						lastValidY = y
+						hasLastValid = true
+					}
+				}
+			}
+			dc.Stroke()
+
+		case "bar":
+			// Рисуем бары (столбцы)
+			dc.SetLineWidth(1)
+
+			// Для баров используем меньшую ширину, чем для свечей
+			barWidth := candleWidth * 0.4
+
+			for i := 0; i < len(vals) && i < len(cdls); i++ {
+				x := leftMargin + float64(i)*candleWidth + candleWidth/2.0
+				y := mapValueToCanvas(vals[0][i], min, max, canvasHeight) + candleChartTop
+
+				// Рисуем бар от оси Y до значения
+				baseY := mapValueToCanvas(0, min, max, canvasHeight) + candleChartTop
+				dc.DrawRectangle(x-barWidth/2.0, math.Min(y, baseY), barWidth, math.Abs(y-baseY))
+				dc.Fill()
+			}
+
+		case "macd":
+			// Для MACD нужна специальная обработка, так как у него несколько линий
+			// В этом примере просто рисуем основную линию
+			dc.SetLineWidth(1.5)
+
+			for i := 0; i < len(vals) && i < len(cdls); i++ {
+				for j := 1; j < len(vals[i]); j++ {
+					if j != 2 {
+						x1 := leftMargin + float64(j-1)*candleWidth + candleWidth/2.0
+						x2 := leftMargin + float64(j)*candleWidth + candleWidth/2.0
+
+						y1 := mapValueToCanvas(vals[i][j-1], min, max, canvasHeight)
+						y2 := mapValueToCanvas(vals[i][j], min, max, canvasHeight)
+						dc.DrawLine(x1, y1, x2, y2)
+					} else {
+						// histogram
+						dc.SetLineWidth(1)
+						barWidth := candleWidth * 0.6
+						x := leftMargin + float64(i)*candleWidth + candleWidth/2.0
+						y := mapValueToCanvas(vals[i][j], min, max, canvasHeight) + candleChartTop
+						baseY := mapValueToCanvas(0, min, max, canvasHeight) + candleChartTop
+						dc.DrawRectangle(x-barWidth/2.0, math.Min(y, baseY), barWidth, math.Abs(y-baseY))
+						dc.Fill()
+					}
+				}
+			}
+			dc.Stroke()
+
+		default:
+			// По умолчанию просто рисуем линию
+			dc.SetLineWidth(1.5)
+
+			for i := 1; i < len(vals) && i < len(cdls); i++ {
+				for j := 0; j < len(vals[i]); j++ {
+					x1 := leftMargin + float64(i-1)*candleWidth + candleWidth/2.0
+					x2 := leftMargin + float64(i)*candleWidth + candleWidth/2.0
+
+					y1 := mapValueToCanvas(vals[i-1][j], min, max, canvasHeight)
+					y2 := mapValueToCanvas(vals[i][j], min, max, canvasHeight)
+					dc.DrawLine(x1, y1, x2, y2)
+				}
+			}
+			dc.Stroke()
+		}
+	}
+
+	// Рисуем индикаторы на отдельных графиках ниже основного
+	for indIdx, ind := range c.cfg.indicators {
+		if ind == nil {
+			continue
+		}
+
+		// Вычисляем координаты и размеры графика индикатора
+		indTop := candleChartBottom + 5.0 + float64(indIdx)*partHeight
+		indBottom := indTop + partHeight - 5.0
+		indHeight := indBottom - indTop
+
+		// Рисуем рамку для графика индикатора
+		dc.SetRGB(0, 0, 0)
+		dc.SetLineWidth(1)
+		dc.DrawLine(leftMargin, indTop, leftMargin, indBottom)                    // Вертикальная ось Y
+		dc.DrawLine(leftMargin, indBottom, float64(width)-rightMargin, indBottom) // Горизонтальная ось X
+		dc.Stroke()
+
+		// Добавляем название индикатора
+		dc.SetRGB(0, 0, 0)
+		dc.DrawStringAnchored(ind.name(), leftMargin+10, indTop+10, 0, 0.5)
+
+		// Получаем значения индикатора
+		vals := ind.calcVals(closes) // Используем closes как базовый набор данных
+		if len(vals) == 0 {
+			continue // Пропускаем, если нет данных
+		}
+
+		// Находим минимум и максимум для масштабирования индикатора
+		// Рисуем значения на оси Y для индикатора
+		var indMin, indMax float64
+		switch {
+		case strings.HasPrefix(ind.name(), "RSI"):
+			indMin = 0
+			indMax = 100
+			for _, i := range []int{30, 70} {
+				y := indTop + indHeight - (indHeight * float64(i) / float64(indMax))
+				dc.SetRGB(0, 0, 0)
+				dc.DrawStringAnchored(fmt.Sprintf("%v", i), leftMargin-5, y, 1.0, 0.5)
+
+				// Рисуем горизонтальные линии сетки
+				dc.SetRGBA(0, 0, 0, 0.2)
+				dc.DrawLine(leftMargin, y, float64(width)-rightMargin, y)
+				dc.Stroke()
+			}
+		case strings.HasPrefix(ind.name(), "MACD"):
+			indMin, indMax = findMinMax(vals...)
+
+			// Минимальное значение
+			y := indBottom
+			dc.SetRGB(0, 0, 0)
+			dc.DrawStringAnchored(fmt.Sprintf("%.2f", indMin), leftMargin-5, y, 1.0, 0.5)
+			dc.SetRGBA(0, 0, 0, 0.2)
+			dc.DrawLine(leftMargin, y, float64(width)-rightMargin, y)
+			dc.Stroke()
+
+			// Нулевое значение
+			value := 0.0
+			y = indTop + indHeight - (indHeight * (value - indMin) / (indMax - indMin))
+			dc.SetRGB(0, 0, 0)
+			dc.DrawStringAnchored(fmt.Sprintf("%.2f", value), leftMargin-5, y, 1.0, 0.5)
+			dc.SetRGBA(0, 0, 0, 0.2)
+			dc.DrawLine(leftMargin, y, float64(width)-rightMargin, y)
+			dc.Stroke()
+
+			// Максимальное значение
+			y = indTop
+			dc.SetRGB(0, 0, 0)
+			dc.DrawStringAnchored(fmt.Sprintf("%.2f", indMax), leftMargin-5, y, 1.0, 0.5)
+			dc.SetRGBA(0, 0, 0, 0.2)
+			dc.DrawLine(leftMargin, y, float64(width)-rightMargin, y)
+			dc.Stroke()
+		default:
+			indMin, indMax = findMinMax(vals...)
+			steps := 3
+			for i := 0; i <= steps; i++ {
+				value := indMin + (indMax-indMin)*float64(i)/float64(steps)
+				y := indTop + indHeight - (indHeight * float64(i) / float64(steps))
+				dc.SetRGB(0, 0, 0)
+				dc.DrawStringAnchored(fmt.Sprintf("%.2f", value), leftMargin-5, y, 1.0, 0.5)
+
+				// Рисуем горизонтальные линии сетки
+				dc.SetRGBA(0, 0, 0, 0.2)
+				dc.DrawLine(leftMargin, y, float64(width)-rightMargin, y)
+				dc.Stroke()
+			}
+		}
+
+		// Определяем тип отрисовки
+		drawType := ind.getDrawType()
+
+		// Настраиваем цвет для индикатора
+		// Цвет по умолчанию - зеленый
+		dc.SetRGB(0.0, 0.8, 0.0)
+
+		// Отрисовываем в зависимости от типа
+		switch drawType {
+		case "line":
+			// Рисуем линию
+			dc.SetLineWidth(1.5)
+
+			for i := 0; i < len(vals) && i < len(cdls); i++ {
+				for j := 1; j < len(vals[i]); j++ {
+					x1 := leftMargin + float64(j-1)*candleWidth + candleWidth/2.0
+					x2 := leftMargin + float64(j)*candleWidth + candleWidth/2.0
+
+					// Отображаем значения в пределах графика индикатора
+					y1 := indTop + indHeight - (indHeight * (vals[i][j-1] - indMin) / (indMax - indMin))
+					y2 := indTop + indHeight - (indHeight * (vals[i][j] - indMin) / (indMax - indMin))
+
+					dc.DrawLine(x1, y1, x2, y2)
+				}
+			}
+			dc.Stroke()
+
+		case "bar":
+			// Рисуем бары (столбцы)
+			dc.SetLineWidth(1)
+
+			// Для баров используем меньшую ширину, чем для свечей
+			barWidth := candleWidth * 0.4
+
+			for i := 0; i < len(vals) && i < len(cdls); i++ {
+				x := leftMargin + float64(i)*candleWidth + candleWidth/2.0
+
+				// Отображаем значения в пределах графика индикатора
+				y := indTop + indHeight - (indHeight * (vals[0][i] - indMin) / (indMax - indMin))
+				baseY := indBottom
+
+				dc.DrawRectangle(x-barWidth/2.0, math.Min(y, baseY), barWidth, math.Abs(y-baseY))
+				dc.Fill()
+			}
+
+		case "macd":
+			// Для MACD нужна специальная обработка, так как у него несколько линий
+
+			// Сначала отрисовываем гистограмму (индекс 2)
+			if len(vals) >= 3 && len(vals[2]) > 0 { // Проверяем, есть ли данные гистограммы
+				dc.SetLineWidth(1)
+				barWidth := candleWidth * 0.4
+
+				// Вычисляем базовую линию для нуля
+				baseY := indTop + indHeight - (indHeight * (0 - indMin) / (indMax - indMin))
+
+				for j := 0; j < len(vals[2]) && j < len(cdls); j++ {
+					x := leftMargin + float64(j)*candleWidth + candleWidth/2.0
+					y := indTop + indHeight - (indHeight * (vals[2][j] - indMin) / (indMax - indMin))
+
+					// Цвет баров в зависимости от значения
+					if vals[2][j] >= 0 {
+						dc.SetRGB(0, 0.7, 0) // Зеленый для положительных значений
+					} else {
+						dc.SetRGB(0.7, 0, 0) // Красный для отрицательных
+					}
+
+					dc.DrawRectangle(x-barWidth/2.0, math.Min(y, baseY), barWidth, math.Abs(y-baseY))
+					dc.Fill()
+				}
+			}
+
+			// Затем отрисовываем линии MACD и сигнальную линию
+			// MACD линия - синяя
+			if len(vals) >= 1 && len(vals[0]) > 1 {
+				dc.SetLineWidth(1.5)
+				dc.SetRGB(0.0, 0.0, 0.8) // Синий цвет для MACD
+
+				for j := 1; j < len(vals[0]) && j < len(cdls); j++ {
+					x1 := leftMargin + float64(j-1)*candleWidth + candleWidth/2.0
+					x2 := leftMargin + float64(j)*candleWidth + candleWidth/2.0
+
+					y1 := indTop + indHeight - (indHeight * (vals[0][j-1] - indMin) / (indMax - indMin))
+					y2 := indTop + indHeight - (indHeight * (vals[0][j] - indMin) / (indMax - indMin))
+
+					dc.DrawLine(x1, y1, x2, y2)
+				}
+				dc.Stroke()
+			}
+
+			// Сигнальная линия - красная
+			if len(vals) >= 2 && len(vals[1]) > 1 {
+				dc.SetLineWidth(1.5)
+				dc.SetRGB(0.8, 0.0, 0.0) // Красный цвет для сигнальной линии
+
+				for j := 1; j < len(vals[1]) && j < len(cdls); j++ {
+					x1 := leftMargin + float64(j-1)*candleWidth + candleWidth/2.0
+					x2 := leftMargin + float64(j)*candleWidth + candleWidth/2.0
+
+					y1 := indTop + indHeight - (indHeight * (vals[1][j-1] - indMin) / (indMax - indMin))
+					y2 := indTop + indHeight - (indHeight * (vals[1][j] - indMin) / (indMax - indMin))
+
+					dc.DrawLine(x1, y1, x2, y2)
+				}
+				dc.Stroke()
+			}
+			dc.Stroke()
+
+		default:
+			// По умолчанию просто рисуем линию
+			dc.SetLineWidth(1.5)
+
+			for i := 1; i < len(vals) && i < len(cdls); i++ {
+				x1 := leftMargin + float64(i-1)*candleWidth + candleWidth/2.0
+				x2 := leftMargin + float64(i)*candleWidth + candleWidth/2.0
+
+				// Отображаем значения в пределах графика индикатора
+				y1 := indTop + indHeight - (indHeight * (vals[0][i-1] - indMin) / (indMax - indMin))
+				y2 := indTop + indHeight - (indHeight * (vals[0][i] - indMin) / (indMax - indMin))
+
+				dc.DrawLine(x1, y1, x2, y2)
+			}
+			dc.Stroke()
+		}
+	}
+
+	// Рисуем индикатор Volume в конце
+	// Вычисляем координаты и размеры графика Volume
+	// Объявляем основные переменные для Volume
+	var (
+		volIdx    int
+		volTop    float64
+		volBottom float64
+		volHeight float64
+		volMinVal float64
+		volMaxVal float64
+		barWidth  float64 // Ширина баров объема
+	)
+
+	volIdx = len(c.cfg.indicators)
+	volTop = candleChartBottom + 5.0 + float64(volIdx)*partHeight
+	volBottom = volTop + partHeight - 5.0
+	volHeight = volBottom - volTop
+
+	// Рисуем рамку для графика Volume
+	dc.SetRGB(0, 0, 0)
+	dc.SetLineWidth(1)
+	dc.DrawLine(leftMargin, volTop, leftMargin, volBottom)                    // Вертикальная ось Y
+	dc.DrawLine(leftMargin, volBottom, float64(width)-rightMargin, volBottom) // Горизонтальная ось X
+	dc.Stroke()
+
+	// Добавляем название Volume
+	dc.SetRGB(0, 0, 0)
+	dc.DrawStringAnchored("Volume", leftMargin+10, volTop+10, 0, 0.5)
+
+	// Находим минимум и максимум для масштабирования Volume
+	volMinVal, volMaxVal = findMinMax([]float64(vols))
+
+	// Рисуем значения на оси Y для Volume
+	volSteps := 3
+	for i := 0; i <= volSteps; i++ {
+		value := volMinVal + (volMaxVal-volMinVal)*float64(i)/float64(volSteps)
+		y := volTop + volHeight - (volHeight * float64(i) / float64(volSteps))
+		dc.SetRGB(0, 0, 0)
+		dc.DrawStringAnchored(fmt.Sprintf("%.0f", value), leftMargin-5, y, 1.0, 0.5)
+
+		// Рисуем горизонтальные линии сетки
+		dc.SetRGBA(0, 0, 0, 0.2)
+		dc.DrawLine(leftMargin, y, float64(width)-rightMargin, y)
+		dc.Stroke()
+	}
+
+	// Рисуем бары объема
+	barWidth = candleWidth * 0.6
+
+	for i := 0; i < len(vols) && i < len(cdls); i++ {
+		x := leftMargin + float64(i)*candleWidth + candleWidth/2.0
+
+		// Отображаем значения в пределах графика Volume
+		var y float64 = volTop + volHeight - (volHeight * (vols[i] - volMinVal) / (volMaxVal - volMinVal))
+		baseY := volBottom
+
+		// Цвет бара зависит от направления свечи (растущая или падающая)
+		if i > 0 && cdls[i].C > cdls[i].O {
+			// Бычья свеча (зеленая)
+			dc.SetRGB(0, 0.8, 0)
+		} else {
+			// Медвежья свеча (красная)
+			dc.SetRGB(0.8, 0, 0)
+		}
+
+		dc.DrawRectangle(x-barWidth/2.0, math.Min(y, baseY), barWidth, math.Abs(y-baseY))
+		dc.Fill()
+	}
+
+	// Сохраняем изображение
+	return dc.SavePNG(path)
+}
+
+// parseHexColor парсит HTML-цветовой код в color.RGBA
+func parseHexColor(hexColor string) (color.RGBA, error) {
+	var r, g, b uint8
+	hexColor = strings.TrimPrefix(hexColor, "#")
+
+	if len(hexColor) == 6 {
+		n, err := fmt.Sscanf(hexColor, "%02x%02x%02x", &r, &g, &b)
+		if err != nil || n != 3 {
+			return color.RGBA{}, err
+		}
+	} else {
+		return color.RGBA{}, fmt.Errorf("invalid hex color: %s", hexColor)
+	}
+
+	return color.RGBA{r, g, b, 255}, nil
+}
+
+// findMinMax находит минимальное и максимальное значение в массивах
+func findMinMax(arrays ...[]float64) (min, max float64) {
+	min = float64(^uint(0) >> 1) // Max value for int
+	max = -min
+
+	for _, array := range arrays {
+		for _, v := range array {
+			if v < min {
+				min = v
+			}
+			if v > max {
+				max = v
+			}
+		}
+	}
+
+	// Добавляем немного запаса для лучшего отображения
+	padding := (max - min) * 0.05
+	min -= padding
+	max += padding
+
+	return
+}
+
+// mapValueToCanvas преобразует значение из диапазона данных в координату на холсте
+func mapValueToCanvas(value, min, max, canvasHeight float64) float64 {
+	// Обратите внимание, что координата Y в canvas начинается сверху,
+	// поэтому нам нужно инвертировать значение
+	return 25.0 + canvasHeight - (value-min)/(max-min)*canvasHeight
 }
 
 func (c TAChart) GenStatic(cdls []Candle, events []Event, path string) error {

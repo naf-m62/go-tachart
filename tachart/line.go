@@ -16,19 +16,23 @@ type line struct {
 	dp      int
 }
 
-func NewLine(name string, vals []float64) Indicator {
+func NewLine(name string, vals []float64, color int) Indicator {
 	if !checkNoZeroVals(vals) {
 		return nil
 	}
-	return &line{
+	fmt.Println("NewLine", name)
+	l := &line{
 		nms:     []string{name},
 		valsArr: [][]float64{vals},
 		nc:      1,
+		ci:      color,
 		dp:      decimals(vals),
 	}
+	fmt.Println("NewLine", l)
+	return l
 }
 
-func NewLine2(n0 string, vals0 []float64, n1 string, vals1 []float64) Indicator {
+func NewLine2(n0 string, vals0 []float64, n1 string, vals1 []float64, color int) Indicator {
 	if !checkNoZeroVals(vals0) || !checkNoZeroVals(vals1) {
 		return nil
 	}
@@ -36,11 +40,12 @@ func NewLine2(n0 string, vals0 []float64, n1 string, vals1 []float64) Indicator 
 		nms:     []string{n0, n1},
 		valsArr: [][]float64{vals0, vals1},
 		nc:      2,
+		ci:      color,
 		dp:      decimals(vals0, vals1),
 	}
 }
 
-func NewLine3(n0 string, vals0 []float64, n1 string, vals1 []float64, n2 string, vals2 []float64) Indicator {
+func NewLine3(n0 string, vals0 []float64, n1 string, vals1 []float64, n2 string, vals2 []float64, color int) Indicator {
 	if !checkNoZeroVals(vals0) || !checkNoZeroVals(vals1) || !checkNoZeroVals(vals2) {
 		return nil
 	}
@@ -48,6 +53,7 @@ func NewLine3(n0 string, vals0 []float64, n1 string, vals1 []float64, n2 string,
 		nms:     []string{n0, n1, n2},
 		valsArr: [][]float64{vals0, vals1, vals2},
 		nc:      3,
+		ci:      color,
 		dp:      decimals(vals0, vals1, vals2),
 	}
 }
@@ -68,12 +74,11 @@ func (b line) yAxisMax() string {
 	return strings.Replace(maxRoundFuncTpl, "__DECIMAL_PLACES__", fmt.Sprintf("%v", b.dp), -1)
 }
 
-func (b line) getNumColors() int {
-	return b.nc
+func (b line) getColor() int {
+	return b.ci
 }
 
-func (b *line) getTitleOpts(top, left int, colorIndex int) []opts.Title {
-	b.ci = colorIndex
+func (b *line) getTitleOpts(top, left int) []opts.Title {
 	var tls []opts.Title
 	for i, nm := range b.nms {
 		tls = append(tls, opts.Title{
@@ -163,15 +168,19 @@ func (b line) genChart(_, _, _, _, _ []float64, xAxis interface{}, gridIndex int
 }
 
 // calcVals implements Indicator.
-func (b *line) calcVals(vals []float64) {
-	panic("unimplemented")
+func (b *line) calcVals(vals []float64) [][]float64 {
+	return b.valsArr
+}
+
+func (b *line) getDrawType() string {
+	return "line"
 }
 
 func checkNoZeroVals(vals []float64) bool {
 	for _, v := range vals {
-		if v != 0 {
-			return true
+		if v == 0 {
+			return false
 		}
 	}
-	return false
+	return true
 }

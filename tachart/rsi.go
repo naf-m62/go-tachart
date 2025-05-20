@@ -19,12 +19,13 @@ type rsi struct {
 	vals       []float64
 }
 
-func NewRSI(n int, oversold, overbought float64) Indicator {
+func NewRSI(n int, oversold, overbought float64, color int) Indicator {
 	return &rsi{
 		nm:         fmt.Sprintf("RSI(%v)", n),
 		n:          int64(n),
 		oversold:   oversold,
 		overbought: overbought,
+		ci:         color,
 	}
 }
 
@@ -72,12 +73,11 @@ func (r rsi) yAxisMax() string {
 	return fmt.Sprintf(`function(value) { return %v }`, maxVal)
 }
 
-func (r rsi) getNumColors() int {
-	return 1
+func (r rsi) getColor() int {
+	return r.ci
 }
 
-func (r *rsi) getTitleOpts(top, left int, colorIndex int) []opts.Title {
-	r.ci = colorIndex
+func (r *rsi) getTitleOpts(top, left int) []opts.Title {
 	return []opts.Title{
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
@@ -91,8 +91,13 @@ func (r *rsi) getTitleOpts(top, left int, colorIndex int) []opts.Title {
 	}
 }
 
-func (r *rsi) calcVals(closes []float64) {
+func (r *rsi) calcVals(closes []float64) [][]float64 {
 	r.vals = tart.RsiArr(closes, r.n)
+	return [][]float64{r.vals}
+}
+
+func (r rsi) getDrawType() string {
+	return "line"
 }
 
 func (r rsi) genChart(_, _, _, closes, _ []float64, xAxis interface{}, gridIndex int) charts.Overlaper {

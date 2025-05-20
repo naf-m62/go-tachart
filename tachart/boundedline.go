@@ -18,7 +18,7 @@ type boundedLine struct {
 	ci          int
 }
 
-func NewBoundedLine(name string, vals []float64, min, max, lowerMarker, upperMarker float64) Indicator {
+func NewBoundedLine(name string, vals []float64, min, max, lowerMarker, upperMarker float64, color int) Indicator {
 	return &boundedLine{
 		nm:          name,
 		vals:        vals,
@@ -26,6 +26,7 @@ func NewBoundedLine(name string, vals []float64, min, max, lowerMarker, upperMar
 		max:         max,
 		lowerMarker: lowerMarker,
 		upperMarker: upperMarker,
+		ci:          color,
 	}
 }
 
@@ -45,12 +46,11 @@ func (b boundedLine) yAxisMax() string {
 	return fmt.Sprintf("function(value) { return %v }", b.max)
 }
 
-func (b boundedLine) getNumColors() int {
-	return 1
+func (b boundedLine) getColor() int {
+	return b.ci
 }
 
-func (b *boundedLine) getTitleOpts(top, left int, colorIndex int) []opts.Title {
-	b.ci = colorIndex
+func (b *boundedLine) getTitleOpts(top, left int) []opts.Title {
 	return []opts.Title{
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
@@ -105,7 +105,10 @@ func (b boundedLine) genChart(_, _, _, _, _ []float64, xAxis interface{}, gridIn
 		)
 }
 
-// calcVals implements Indicator. Need for cal yMin and yMax
-func (b *boundedLine) calcVals(vals []float64) {
-	panic("unimplemented")
+func (b *boundedLine) calcVals(values []float64) [][]float64 {
+	return [][]float64{b.vals}
+}
+
+func (b boundedLine) getDrawType() string {
+	return "boundedline"
 }

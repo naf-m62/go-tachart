@@ -17,10 +17,11 @@ type atr struct {
 	dp int
 }
 
-func NewATR(n int) Indicator {
+func NewATR(n int, color int) Indicator {
 	return &atr{
 		nm: fmt.Sprintf("ATR(%v)", n),
 		n:  int64(n),
+		ci: color,
 	}
 }
 
@@ -40,12 +41,11 @@ func (a atr) yAxisMax() string {
 	return strings.Replace(maxRoundFuncTpl, "__DECIMAL_PLACES__", fmt.Sprintf("%v", a.dp), -1)
 }
 
-func (a atr) getNumColors() int {
-	return 1
+func (a atr) getColor() int {
+	return a.ci
 }
 
-func (a *atr) getTitleOpts(top, left int, colorIndex int) []opts.Title {
-	a.ci = colorIndex
+func (a *atr) getTitleOpts(top, left int) []opts.Title {
 	return []opts.Title{
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
@@ -86,7 +86,10 @@ func (a atr) genChart(_, highs, lows, closes, _ []float64, xAxis interface{}, gr
 			}))
 }
 
-// calcVals implements Indicator. Need for cal yMin and yMax
-func (a *atr) calcVals(vals []float64) {
-	panic("unimplemented")
+func (a *atr) calcVals(values []float64) [][]float64 {
+	panic("not implemented")
+}
+
+func (a atr) getDrawType() string {
+	return "line"
 }

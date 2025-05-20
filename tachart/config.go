@@ -8,13 +8,19 @@ import (
 
 // page is conceptually divided into 3x3 grids:
 // ----------------------------------------------
-//                      top
+//
+//	top
+//
 // ----------------------------------------------
-//           |                       |
-//    left   |          chart        |   right
-//           |                       |
+//
+//	       |                       |
+//	left   |          chart        |   right
+//	       |                       |
+//
 // ----------------------------------------------
-//                      bottom
+//
+//	bottom
+//
 // ----------------------------------------------
 type pageLayout struct {
 	chartWidth    int

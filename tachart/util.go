@@ -46,6 +46,8 @@ func stepsFromOne(v float64) int {
 			step++
 			v /= 10
 		}
+	} else if v == 0 {
+		return step
 	} else if v < 1 {
 		for v < 1 {
 			step--

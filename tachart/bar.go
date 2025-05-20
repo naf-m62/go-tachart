@@ -15,10 +15,11 @@ type bar struct {
 	dp   int
 }
 
-func NewBar(name string, vals []float64) Indicator {
+func NewBar(name string, vals []float64, color int) Indicator {
 	return &bar{
 		nm:   name,
 		vals: vals,
+		ci:   color,
 		dp:   decimals(vals),
 	}
 }
@@ -39,12 +40,11 @@ func (b bar) yAxisMax() string {
 	return strings.Replace(maxRoundFuncTpl, "__DECIMAL_PLACES__", fmt.Sprintf("%v", b.dp), -1)
 }
 
-func (b bar) getNumColors() int {
-	return 1
+func (b bar) getColor() int {
+	return b.ci
 }
 
-func (b *bar) getTitleOpts(top, left int, colorIndex int) []opts.Title {
-	b.ci = colorIndex
+func (b *bar) getTitleOpts(top, left int) []opts.Title {
 	return []opts.Title{
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
@@ -77,7 +77,10 @@ func (b bar) genChart(_, _, _, _, _ []float64, xAxis interface{}, gridIndex int)
 		}))
 }
 
-// calcVals implements Indicator. Need for cal yMin and yMax
-func (b *bar) calcVals(vals []float64) {
-	panic("unimplemented")
+func (b *bar) calcVals(values []float64) [][]float64 {
+	panic("not implemented")
+}
+
+func (b bar) getDrawType() string {
+	return "bar"
 }

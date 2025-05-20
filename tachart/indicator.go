@@ -20,11 +20,13 @@ type Indicator interface {
 	// y axis max label formatter
 	yAxisMax() string
 	// # of colors needed
-	getNumColors() int
+	getColor() int
 	// indicator chart legend config
-	getTitleOpts(top, left int, colorIndex int) []opts.Title
+	getTitleOpts(top, left int) []opts.Title
 	// indicator chart config
 	genChart(opens, highs, lows, closes, vols []float64, xAxis interface{}, gridIndex int) charts.Overlaper
 	// calculate indicator values
-	calcVals(vals []float64)
+	calcVals(vals []float64) [][]float64
+	// get draw type (line, bars, etc)
+	getDrawType() string
 }

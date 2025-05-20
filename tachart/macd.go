@@ -60,11 +60,11 @@ func (c macd) yAxisMax() string {
 	return fmt.Sprintf(`function(value) { return %v }`, maxVal)
 }
 
-func (c macd) getNumColors() int {
+func (c macd) getColor() int {
 	return 2
 }
 
-func (c *macd) calcVals(closes []float64) {
+func (c *macd) calcVals(closes []float64) [][]float64 {
 	c.macd, c.signalv, c.hist = tart.MacdArr(closes, c.fast, c.slow, c.signal)
 	// умножаем на 100
 	for i := range c.macd {
@@ -76,10 +76,17 @@ func (c *macd) calcVals(closes []float64) {
 	for i := range c.hist {
 		c.hist[i] *= 100
 	}
+	// Возвращаем все значения для отрисовки
+	// macd, signalv и hist будут доступны через внутреннее состояние
+	return [][]float64{c.macd, c.signalv, c.hist}
 }
 
-func (c *macd) getTitleOpts(top, left int, colorIndex int) []opts.Title {
-	c.ci = colorIndex
+func (c macd) getDrawType() string {
+	return "macd" // Специальный тип для MACD (линии + гистограмма)
+}
+
+func (c *macd) getTitleOpts(top, left int) []opts.Title {
+	c.ci = 2
 	return []opts.Title{
 		opts.Title{
 			TitleStyle: &opts.TextStyle{
