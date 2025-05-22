@@ -2,6 +2,7 @@ package tachart
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/naf-m62/go-tachart/charts"
@@ -17,25 +18,19 @@ type line struct {
 }
 
 func NewLine(name string, vals []float64, color int) Indicator {
-	if !checkNoZeroVals(vals) {
-		return nil
-	}
-	fmt.Println("NewLine", name)
-	l := &line{
+	vals = zeroValsToNaN(vals)
+	return &line{
 		nms:     []string{name},
 		valsArr: [][]float64{vals},
 		nc:      1,
 		ci:      color,
 		dp:      decimals(vals),
 	}
-	fmt.Println("NewLine", l)
-	return l
 }
 
 func NewLine2(n0 string, vals0 []float64, n1 string, vals1 []float64, color int) Indicator {
-	if !checkNoZeroVals(vals0) || !checkNoZeroVals(vals1) {
-		return nil
-	}
+	vals0 = zeroValsToNaN(vals0)
+	vals1 = zeroValsToNaN(vals1)
 	return &line{
 		nms:     []string{n0, n1},
 		valsArr: [][]float64{vals0, vals1},
@@ -46,9 +41,9 @@ func NewLine2(n0 string, vals0 []float64, n1 string, vals1 []float64, color int)
 }
 
 func NewLine3(n0 string, vals0 []float64, n1 string, vals1 []float64, n2 string, vals2 []float64, color int) Indicator {
-	if !checkNoZeroVals(vals0) || !checkNoZeroVals(vals1) || !checkNoZeroVals(vals2) {
-		return nil
-	}
+	vals0 = zeroValsToNaN(vals0)
+	vals1 = zeroValsToNaN(vals1)
+	vals2 = zeroValsToNaN(vals2)
 	return &line{
 		nms:     []string{n0, n1, n2},
 		valsArr: [][]float64{vals0, vals1, vals2},
@@ -97,7 +92,7 @@ func (b *line) getTitleOpts(top, left int) []opts.Title {
 func (b line) genChart(_, _, _, _, _ []float64, xAxis interface{}, gridIndex int) charts.Overlaper {
 	lineItems := []opts.LineData{}
 	for _, v := range b.valsArr[0] {
-		if v == 0 {
+		if v == 0 || math.IsNaN(v) {
 			lineItems = append(lineItems, opts.LineData{})
 			continue
 		}
@@ -131,7 +126,7 @@ func (b line) genChart(_, _, _, _, _ []float64, xAxis interface{}, gridIndex int
 	for i := 1; i < len(b.nms); i++ {
 		lineItems := []opts.LineData{}
 		for _, v := range b.valsArr[i] {
-			if v == 0 {
+			if v == 0 || math.IsNaN(v) {
 				lineItems = append(lineItems, opts.LineData{})
 				continue
 			}
@@ -176,11 +171,11 @@ func (b *line) getDrawType() string {
 	return "line"
 }
 
-func checkNoZeroVals(vals []float64) bool {
-	for _, v := range vals {
+func zeroValsToNaN(vals []float64) []float64 {
+	for i, v := range vals {
 		if v == 0 {
-			return false
+			vals[i] = math.NaN()
 		}
 	}
-	return true
+	return vals
 }

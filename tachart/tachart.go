@@ -421,6 +421,10 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 	candleWidth := canvasWidth / float64(len(cdls))
 	candleBarWidth := candleWidth * 0.6
 
+	// каждые 120px рисуем метку на оси X
+	// высчитываем сколько свечей в 120 px
+	candleCount := int(120 / candleWidth)
+
 	for i, cdl := range cdls {
 		x := leftMargin + float64(i)*candleWidth + candleWidth/2.0
 		// Добавляем отступ сверху к координатам
@@ -429,11 +433,6 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 		yLow := mapValueToCanvas(cdl.L, min, max, canvasHeight) + candleChartTop
 		yHigh := mapValueToCanvas(cdl.H, min, max, canvasHeight) + candleChartTop
 
-		// Рисуем линию от минимума до максимума
-		dc.DrawLine(x, yLow, x, yHigh)
-		dc.Stroke()
-
-		// Рисуем тело свечи
 		if cdl.O > cdl.C {
 			// Медвежья свеча (красная)
 			dc.SetRGB(1, 0, 0)
@@ -442,6 +441,11 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 			dc.SetRGB(0, 1, 0)
 		}
 
+		// Рисуем линию от минимума до максимума
+		dc.DrawLine(x, yLow, x, yHigh)
+		dc.Stroke()
+
+		// Рисуем тело свечи
 		yBodyTop := yOpen
 		yBodyBottom := yClose
 		if yOpen > yClose {
@@ -449,13 +453,22 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 			yBodyBottom = yOpen
 		}
 
-		dc.DrawRectangle(x-candleBarWidth/2.0, yBodyTop, candleBarWidth, yBodyBottom-yBodyTop)
-		dc.Fill()
+		if cdl.O == cdl.C {
+			// Рисуем линию
+			dc.DrawLine(x-candleBarWidth/2.0, yBodyTop, x+candleBarWidth/2.0, yBodyTop)
+			dc.Stroke()
+		} else {
+			dc.DrawRectangle(x-candleBarWidth/2.0, yBodyTop, candleBarWidth, yBodyBottom-yBodyTop)
+			dc.Fill()
+		}
 
-		// Каждые 10 свечей рисуем метку на оси X
-		if i%10 == 0 && i < len(cdls)-1 {
+		// Каждые candleCount свечей рисуем метку на оси X
+		if i%candleCount == 0 && i < len(cdls)-1 {
+			// рисуем линию над меткой
 			dc.SetRGB(0, 0, 0)
-			dc.DrawString(cdls[i].Label, x, float64(height)-5)
+			dc.DrawLine(x, float64(height)-bottomMargin, x, float64(height)-bottomMargin+10)
+			dc.DrawString(cdls[i].Label, x, float64(height)-bottomMargin+20)
+			dc.Stroke()
 		}
 	}
 
@@ -608,8 +621,8 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 		}
 
 		// Вычисляем координаты и размеры графика индикатора
-		indTop := candleChartBottom + 5.0 + float64(indIdx)*partHeight
-		indBottom := indTop + partHeight - 5.0
+		indTop := candleChartBottom + 20.0 + float64(indIdx)*partHeight
+		indBottom := indTop + partHeight - 20.0
 		indHeight := indBottom - indTop
 
 		// Рисуем рамку для графика индикатора
