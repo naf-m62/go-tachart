@@ -357,12 +357,21 @@ func New(cfg Config, cdls []Candle) *TAChart {
 
 // GenImage generates and returns chart as a PNG image byte slice
 func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
-	// Создаем холст изображения с размерами, соответствующими размерам графика
+	if len(cdls) == 0 {
+		return nil, errors.New("no candles")
+	}
+	// Create image context with chart dimensions
 	width := c.cfg.layout.chartWidth
+	if width < 200 {
+		width = 200
+	}
 	height := c.cfg.layout.chartHeight
+	if height < 100 {
+		height = 100
+	}
 	dc := gg.NewContext(width, height)
 
-	// Заполняем фон
+	// Fill background
 	pageBgColor := pageBgColorMap[c.cfg.theme]
 	if pageBgColor == "" {
 		pageBgColor = "#FFFFFF"
@@ -371,23 +380,23 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 	dc.SetColor(bgColor)
 	dc.Clear()
 
-	// Рассчитываем высоты блоков графиков
-	const topMargin = 0.0     // Отступ сверху
-	const bottomMargin = 30.0 // Отступ снизу для дат
-	const leftMargin = 75.0   // Отступ слева для меток оси Y
-	const rightMargin = 25.0  // Отступ справа
+	// Calculate chart parts dimensions
+	const topMargin = 0.0     // Top margin
+	const bottomMargin = 30.0 // Bottom margin for dates
+	const leftMargin = 75.0   // Left margin for Y axis labels
+	const rightMargin = 25.0  // Right margin
 
 	numIndicators := len(c.cfg.indicators) + 1 // volume indicator
-	totalParts := 4 + numIndicators            // 4/7 - свечной график, по 1/7 - каждый индикатор
+	totalParts := 4 + numIndicators            // 4/7 - candle chart, 1/7 - each indicator
 	usableHeight := float64(height) - bottomMargin
 	partHeight := usableHeight / float64(totalParts)
 
-	// Размеры свечного графика
+	// Candlestick chart dimensions
 	candleChartHeight := partHeight * 4
-	candleChartTop := topMargin // Отступ сверху
+	candleChartTop := topMargin // Top margin
 	candleChartBottom := candleChartTop + candleChartHeight
 
-	// Рисуем свечной график
+	// Draw candlestick chart
 	xAxis := make([]string, 0)
 	klineSeries := []opts.KlineData{}
 	opens := []float64{}
@@ -405,47 +414,47 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 		vols = append(vols, cdl.V)
 	}
 
-	// Находим минимум и максимум для масштабирования свечного графика
+	// Find min and max for candlestick chart scaling
 	min, max := findMinMax(lows, highs)
-	canvasWidth := float64(width) - 100.0    // Оставляем место для осей
-	canvasHeight := candleChartHeight - 25.0 // Высота свечного графика с учетом отступов
+	canvasWidth := float64(width) - 100.0    // Leave space for axes
+	canvasHeight := candleChartHeight - 25.0 // Candlestick chart height with margin
 
-	// Рисуем рамку для свечного графика
+	// Draw candlestick chart border
 	dc.SetRGB(0, 0, 0)
 	dc.SetLineWidth(1)
-	dc.DrawLine(leftMargin, candleChartTop, leftMargin, candleChartBottom)                    // Вертикальная ось Y
-	dc.DrawLine(leftMargin, candleChartBottom, float64(width)-rightMargin, candleChartBottom) // Горизонтальная ось X
+	dc.DrawLine(leftMargin, candleChartTop, leftMargin, candleChartBottom)                    // Vertical Y axis
+	dc.DrawLine(leftMargin, candleChartBottom, float64(width)-rightMargin, candleChartBottom) // Horizontal X axis
 	dc.Stroke()
 
-	// Рисуем свечи
+	// Draw candles
 	candleWidth := canvasWidth / float64(len(cdls))
 	candleBarWidth := candleWidth * 0.6
 
-	// каждые 120px рисуем метку на оси X
-	// высчитываем сколько свечей в 120 px
+	// every 120px draw X axis label
+	// calculate how many candles in 120 px
 	candleCount := int(120 / candleWidth)
 
 	for i, cdl := range cdls {
 		x := leftMargin + float64(i)*candleWidth + candleWidth/2.0
-		// Добавляем отступ сверху к координатам
+		// Add top margin to coordinates
 		yOpen := mapValueToCanvas(cdl.O, min, max, canvasHeight) + candleChartTop
 		yClose := mapValueToCanvas(cdl.C, min, max, canvasHeight) + candleChartTop
 		yLow := mapValueToCanvas(cdl.L, min, max, canvasHeight) + candleChartTop
 		yHigh := mapValueToCanvas(cdl.H, min, max, canvasHeight) + candleChartTop
 
 		if cdl.O > cdl.C {
-			// Медвежья свеча (красная)
+			// Bull candle (red)
 			dc.SetRGB(1, 0, 0)
 		} else {
-			// Бычья свеча (зеленая)
+			// Bear candle (green)
 			dc.SetRGB(0, 1, 0)
 		}
 
-		// Рисуем линию от минимума до максимума
+		// Draw line from min to max
 		dc.DrawLine(x, yLow, x, yHigh)
 		dc.Stroke()
 
-		// Рисуем тело свечи
+		// Draw candle body
 		yBodyTop := yOpen
 		yBodyBottom := yClose
 		if yOpen > yClose {
@@ -454,7 +463,7 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 		}
 
 		if cdl.O == cdl.C {
-			// Рисуем линию
+			// Draw line
 			dc.DrawLine(x-candleBarWidth/2.0, yBodyTop, x+candleBarWidth/2.0, yBodyTop)
 			dc.Stroke()
 		} else {
@@ -462,9 +471,9 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 			dc.Fill()
 		}
 
-		// Каждые candleCount свечей рисуем метку на оси X
+		// Draw X axis label every candleCount candles
 		if i%candleCount == 0 && i < len(cdls)-1 {
-			// рисуем линию над меткой
+			// Draw line above label
 			dc.SetRGB(0, 0, 0)
 			dc.DrawLine(x, float64(height)-bottomMargin, x, float64(height)-bottomMargin+10)
 			dc.DrawString(cdls[i].Label, x, float64(height)-bottomMargin+20)
@@ -472,38 +481,37 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 		}
 	}
 
-	// Рисуем значения на оси Y для свечного графика
+	// Draw Y axis values for candle chart
 	steps := 5
 	for i := 0; i <= steps; i++ {
 		value := min + (max-min)*float64(i)/float64(steps)
 		y := mapValueToCanvas(value, min, max, canvasHeight)
-		y += candleChartTop // Прибавляем отступ сверху
+		y += candleChartTop // Add top margin
 		dc.SetRGB(0, 0, 0)
 		dc.DrawStringAnchored(fmt.Sprintf("%.2f", value), leftMargin-5, y, 1.0, 0.5)
 
-		// Рисуем горизонтальные линии сетки
+		// Draw horizontal grid lines
 		dc.SetRGBA(0, 0, 0, 0.2)
 		dc.DrawLine(leftMargin, y, float64(width)-rightMargin, y)
 		dc.Stroke()
 	}
 
-	// Рисуем overlays
+	// Draw overlays
 	for _, ol := range c.cfg.overlays {
 		if ol == nil {
 			continue
 		}
 
-		// Получаем значения индикатора
-		vals := ol.calcVals(closes) // Используем closes как базовый набор данных
+		// Get indicator values
+		vals := ol.calcVals(closes) // Use closes as base dataset
 		if len(vals) == 0 {
-			continue // Пропускаем, если нет данных
+			continue // Skip if no data
 		}
 
-		// Определяем тип отрисовки
+		// Determine draw type
 		drawType := ol.getDrawType()
 
-		// Настраиваем цвет для индикатора
-
+		// Set indicator color
 		color, err := parseHexColor(getColor(ol.getColor()))
 		if err != nil {
 			// Цвет по умолчанию - синий
@@ -512,37 +520,37 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 			dc.SetColor(color)
 		}
 
-		// Отрисовываем в зависимости от типа
+		// Draw depending on type
 		switch drawType {
 		case "line":
-			// Рисуем линию
-			dc.SetLineWidth(1.5) // Делаем линию чуть толще, чем у свечей
+			// Draw line
+			dc.SetLineWidth(1.5) // Make line thicker than candlestick
 
-			// Находим min и max для индикатора, если нужно масштабирование
-			// В этом примере используем тот же масштаб, что и для свечей
+			// Find min and max for indicator, if scaling is needed
+			// In this example we use the same scale as for candlestick
 
-			// Рисуем линию, соединяя действительные точки (не NaN)
+			// Draw line connecting valid points (not NaN)
 			for i := 0; i < len(vals) && i < len(cdls); i++ {
 				var lastValidX, lastValidY float64
 				var hasLastValid bool
 
-				// Проходим по всем точкам линии
+				// Iterate over all line points
 				for j := 0; j < len(vals[i]); j++ {
-					// Текущая координата X
+					// Current X coordinate
 					x := leftMargin + float64(j)*candleWidth + candleWidth/2.0
 
-					// Проверяем, является ли текущее значение действительным (не NaN)
+					// Check if current value is valid (not NaN)
 					value := vals[i][j]
 					if !math.IsNaN(value) {
-						// Рассчитываем координату Y для действительного значения
+						// Calculate Y coordinate for valid value
 						y := mapValueToCanvas(value, min, max, canvasHeight) + candleChartTop
 
-						// Если есть предыдущая действительная точка, соединяем с ней линией
+						// If there is a previous valid point, connect it with a line
 						if hasLastValid {
 							dc.DrawLine(lastValidX, lastValidY, x, y)
 						}
 
-						// Запоминаем эту точку как последнюю действительную
+						// Remember this point as the last valid point
 						lastValidX = x
 						lastValidY = y
 						hasLastValid = true
@@ -552,25 +560,25 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 			dc.Stroke()
 
 		case "bar":
-			// Рисуем бары (столбцы)
+			// Draw bars (columns)
 			dc.SetLineWidth(1)
 
-			// Для баров используем меньшую ширину, чем для свечей
+			// Use smaller width than for candles
 			barWidth := candleWidth * 0.4
 
 			for i := 0; i < len(vals) && i < len(cdls); i++ {
 				x := leftMargin + float64(i)*candleWidth + candleWidth/2.0
 				y := mapValueToCanvas(vals[0][i], min, max, canvasHeight) + candleChartTop
 
-				// Рисуем бар от оси Y до значения
+				// Draw bar from Y axis to value
 				baseY := mapValueToCanvas(0, min, max, canvasHeight) + candleChartTop
 				dc.DrawRectangle(x-barWidth/2.0, math.Min(y, baseY), barWidth, math.Abs(y-baseY))
 				dc.Fill()
 			}
 
 		case "macd":
-			// Для MACD нужна специальная обработка, так как у него несколько линий
-			// В этом примере просто рисуем основную линию
+			// For MACD special handling is needed, since it has several lines
+			// In this example we just draw the main line
 			dc.SetLineWidth(1.5)
 
 			for i := 0; i < len(vals) && i < len(cdls); i++ {
@@ -597,7 +605,7 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 			dc.Stroke()
 
 		default:
-			// По умолчанию просто рисуем линию
+			// By default draw line
 			dc.SetLineWidth(1.5)
 
 			for i := 1; i < len(vals) && i < len(cdls); i++ {
@@ -614,36 +622,36 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 		}
 	}
 
-	// Рисуем индикаторы на отдельных графиках ниже основного
+	// Draw indicators on separate charts below the main chart
 	for indIdx, ind := range c.cfg.indicators {
 		if ind == nil {
 			continue
 		}
 
-		// Вычисляем координаты и размеры графика индикатора
+		// Calculate coordinates and sizes for indicator chart
 		indTop := candleChartBottom + 20.0 + float64(indIdx)*partHeight
 		indBottom := indTop + partHeight - 20.0
 		indHeight := indBottom - indTop
 
-		// Рисуем рамку для графика индикатора
+		// Draw frame for indicator chart
 		dc.SetRGB(0, 0, 0)
 		dc.SetLineWidth(1)
-		dc.DrawLine(leftMargin, indTop, leftMargin, indBottom)                    // Вертикальная ось Y
-		dc.DrawLine(leftMargin, indBottom, float64(width)-rightMargin, indBottom) // Горизонтальная ось X
+		dc.DrawLine(leftMargin, indTop, leftMargin, indBottom)                    // Vertical Y axis
+		dc.DrawLine(leftMargin, indBottom, float64(width)-rightMargin, indBottom) // Horizontal X axis
 		dc.Stroke()
 
-		// Добавляем название индикатора
+		// Add indicator name
 		dc.SetRGB(0, 0, 0)
 		dc.DrawStringAnchored(ind.name(), leftMargin+10, indTop+10, 0, 0.5)
 
-		// Получаем значения индикатора
-		vals := ind.calcVals(closes) // Используем closes как базовый набор данных
+		// Get indicator values
+		vals := ind.calcVals(closes) // Use closes as base dataset
 		if len(vals) == 0 {
-			continue // Пропускаем, если нет данных
+			continue // Skip if no data
 		}
 
-		// Находим минимум и максимум для масштабирования индикатора
-		// Рисуем значения на оси Y для индикатора
+		// Find min and max for indicator scaling
+		// Draw values on Y axis for indicator
 		var indMin, indMax float64
 		switch {
 		case strings.HasPrefix(ind.name(), "RSI"):
@@ -654,7 +662,7 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 				dc.SetRGB(0, 0, 0)
 				dc.DrawStringAnchored(fmt.Sprintf("%v", i), leftMargin-5, y, 1.0, 0.5)
 
-				// Рисуем горизонтальные линии сетки
+				// Draw horizontal grid lines
 				dc.SetRGBA(0, 0, 0, 0.2)
 				dc.DrawLine(leftMargin, y, float64(width)-rightMargin, y)
 				dc.Stroke()
@@ -662,7 +670,7 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 		case strings.HasPrefix(ind.name(), "MACD"):
 			indMin, indMax = findMinMax(vals...)
 
-			// Минимальное значение
+			// Minimum value
 			y := indBottom
 			dc.SetRGB(0, 0, 0)
 			dc.DrawStringAnchored(fmt.Sprintf("%.2f", indMin), leftMargin-5, y, 1.0, 0.5)
@@ -670,7 +678,7 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 			dc.DrawLine(leftMargin, y, float64(width)-rightMargin, y)
 			dc.Stroke()
 
-			// Нулевое значение
+			// Zero value
 			value := 0.0
 			y = indTop + indHeight - (indHeight * (value - indMin) / (indMax - indMin))
 			dc.SetRGB(0, 0, 0)
@@ -679,7 +687,7 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 			dc.DrawLine(leftMargin, y, float64(width)-rightMargin, y)
 			dc.Stroke()
 
-			// Максимальное значение
+			// Maximum value
 			y = indTop
 			dc.SetRGB(0, 0, 0)
 			dc.DrawStringAnchored(fmt.Sprintf("%.2f", indMax), leftMargin-5, y, 1.0, 0.5)
@@ -695,24 +703,24 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 				dc.SetRGB(0, 0, 0)
 				dc.DrawStringAnchored(fmt.Sprintf("%.2f", value), leftMargin-5, y, 1.0, 0.5)
 
-				// Рисуем горизонтальные линии сетки
+				// Draw horizontal grid lines
 				dc.SetRGBA(0, 0, 0, 0.2)
 				dc.DrawLine(leftMargin, y, float64(width)-rightMargin, y)
 				dc.Stroke()
 			}
 		}
 
-		// Определяем тип отрисовки
+		// Determine the type of drawing
 		drawType := ind.getDrawType()
 
-		// Настраиваем цвет для индикатора
-		// Цвет по умолчанию - зеленый
+		// Set the color for the indicator
+		// Default color is green
 		dc.SetRGB(0.0, 0.8, 0.0)
 
-		// Отрисовываем в зависимости от типа
+		// Draw depending on the type
 		switch drawType {
 		case "line":
-			// Рисуем линию
+			// Draw line
 			dc.SetLineWidth(1.5)
 
 			for i := 0; i < len(vals) && i < len(cdls); i++ {
@@ -720,7 +728,7 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 					x1 := leftMargin + float64(j-1)*candleWidth + candleWidth/2.0
 					x2 := leftMargin + float64(j)*candleWidth + candleWidth/2.0
 
-					// Отображаем значения в пределах графика индикатора
+					// Display values within the indicator chart
 					y1 := indTop + indHeight - (indHeight * (vals[i][j-1] - indMin) / (indMax - indMin))
 					y2 := indTop + indHeight - (indHeight * (vals[i][j] - indMin) / (indMax - indMin))
 
@@ -730,16 +738,16 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 			dc.Stroke()
 
 		case "bar":
-			// Рисуем бары (столбцы)
+			// Draw bars (columns)
 			dc.SetLineWidth(1)
 
-			// Для баров используем меньшую ширину, чем для свечей
+			// Use smaller width than for candles
 			barWidth := candleWidth * 0.4
 
 			for i := 0; i < len(vals) && i < len(cdls); i++ {
 				x := leftMargin + float64(i)*candleWidth + candleWidth/2.0
 
-				// Отображаем значения в пределах графика индикатора
+				// Display values within the indicator chart
 				y := indTop + indHeight - (indHeight * (vals[0][i] - indMin) / (indMax - indMin))
 				baseY := indBottom
 
@@ -748,25 +756,25 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 			}
 
 		case "macd":
-			// Для MACD нужна специальная обработка, так как у него несколько линий
+			// For MACD special handling is needed, since it has several lines
 
-			// Сначала отрисовываем гистограмму (индекс 2)
-			if len(vals) >= 3 && len(vals[2]) > 0 { // Проверяем, есть ли данные гистограммы
+			// First draw the histogram (index 2)
+			if len(vals) >= 3 && len(vals[2]) > 0 { // Check if histogram data exists
 				dc.SetLineWidth(1)
 				barWidth := candleWidth * 0.4
 
-				// Вычисляем базовую линию для нуля
+				// Calculate the base line for zero
 				baseY := indTop + indHeight - (indHeight * (0 - indMin) / (indMax - indMin))
 
 				for j := 0; j < len(vals[2]) && j < len(cdls); j++ {
 					x := leftMargin + float64(j)*candleWidth + candleWidth/2.0
 					y := indTop + indHeight - (indHeight * (vals[2][j] - indMin) / (indMax - indMin))
 
-					// Цвет баров в зависимости от значения
+					// Color bars depending on the value
 					if vals[2][j] >= 0 {
-						dc.SetRGB(0, 0.7, 0) // Зеленый для положительных значений
+						dc.SetRGB(0, 0.7, 0) // Green for positive values
 					} else {
-						dc.SetRGB(0.7, 0, 0) // Красный для отрицательных
+						dc.SetRGB(0.7, 0, 0) // Red for negative values
 					}
 
 					dc.DrawRectangle(x-barWidth/2.0, math.Min(y, baseY), barWidth, math.Abs(y-baseY))
@@ -774,11 +782,11 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 				}
 			}
 
-			// Затем отрисовываем линии MACD и сигнальную линию
-			// MACD линия - синяя
+			// Then draw the MACD and signal lines
+			// MACD line - blue
 			if len(vals) >= 1 && len(vals[0]) > 1 {
 				dc.SetLineWidth(1.5)
-				dc.SetRGB(0.0, 0.0, 0.8) // Синий цвет для MACD
+				dc.SetRGB(0.0, 0.0, 0.8) // Blue color for MACD
 
 				for j := 1; j < len(vals[0]) && j < len(cdls); j++ {
 					x1 := leftMargin + float64(j-1)*candleWidth + candleWidth/2.0
@@ -792,10 +800,10 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 				dc.Stroke()
 			}
 
-			// Сигнальная линия - красная
+			// Signal line - red
 			if len(vals) >= 2 && len(vals[1]) > 1 {
 				dc.SetLineWidth(1.5)
-				dc.SetRGB(0.8, 0.0, 0.0) // Красный цвет для сигнальной линии
+				dc.SetRGB(0.8, 0.0, 0.0) // Red color for signal line
 
 				for j := 1; j < len(vals[1]) && j < len(cdls); j++ {
 					x1 := leftMargin + float64(j-1)*candleWidth + candleWidth/2.0
@@ -811,14 +819,14 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 			dc.Stroke()
 
 		default:
-			// По умолчанию просто рисуем линию
+			// By default draw line
 			dc.SetLineWidth(1.5)
 
 			for i := 1; i < len(vals) && i < len(cdls); i++ {
 				x1 := leftMargin + float64(i-1)*candleWidth + candleWidth/2.0
 				x2 := leftMargin + float64(i)*candleWidth + candleWidth/2.0
 
-				// Отображаем значения в пределах графика индикатора
+				// Display values within the indicator chart
 				y1 := indTop + indHeight - (indHeight * (vals[0][i-1] - indMin) / (indMax - indMin))
 				y2 := indTop + indHeight - (indHeight * (vals[0][i] - indMin) / (indMax - indMin))
 
@@ -828,9 +836,9 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 		}
 	}
 
-	// Рисуем индикатор Volume в конце
-	// Вычисляем координаты и размеры графика Volume
-	// Объявляем основные переменные для Volume
+	// Draw Volume indicator at the end
+	// Calculate coordinates and sizes for the Volume chart
+	// Declare main variables for Volume
 	var (
 		volIdx    int
 		volTop    float64
@@ -838,7 +846,7 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 		volHeight float64
 		volMinVal float64
 		volMaxVal float64
-		barWidth  float64 // Ширина баров объема
+		barWidth  float64 // volume bar width
 	)
 
 	volIdx = len(c.cfg.indicators)
@@ -846,21 +854,21 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 	volBottom = volTop + partHeight - 5.0
 	volHeight = volBottom - volTop
 
-	// Рисуем рамку для графика Volume
+	// Draw frame for the Volume chart
 	dc.SetRGB(0, 0, 0)
 	dc.SetLineWidth(1)
-	dc.DrawLine(leftMargin, volTop, leftMargin, volBottom)                    // Вертикальная ось Y
-	dc.DrawLine(leftMargin, volBottom, float64(width)-rightMargin, volBottom) // Горизонтальная ось X
+	dc.DrawLine(leftMargin, volTop, leftMargin, volBottom)                    // Vertical Y axis
+	dc.DrawLine(leftMargin, volBottom, float64(width)-rightMargin, volBottom) // Horizontal X axis
 	dc.Stroke()
 
-	// Добавляем название Volume
+	// Add Volume label
 	dc.SetRGB(0, 0, 0)
 	dc.DrawStringAnchored("Volume", leftMargin+10, volTop+10, 0, 0.5)
 
-	// Находим минимум и максимум для масштабирования Volume
+	// Find minimum and maximum for scaling Volume
 	volMinVal, volMaxVal = findMinMax([]float64(vols))
 
-	// Рисуем значения на оси Y для Volume
+	// Draw values on the Y axis for Volume
 	volSteps := 3
 	for i := 0; i <= volSteps; i++ {
 		value := volMinVal + (volMaxVal-volMinVal)*float64(i)/float64(volSteps)
@@ -868,28 +876,28 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 		dc.SetRGB(0, 0, 0)
 		dc.DrawStringAnchored(fmt.Sprintf("%.0f", value), leftMargin-5, y, 1.0, 0.5)
 
-		// Рисуем горизонтальные линии сетки
+		// Draw horizontal grid lines
 		dc.SetRGBA(0, 0, 0, 0.2)
 		dc.DrawLine(leftMargin, y, float64(width)-rightMargin, y)
 		dc.Stroke()
 	}
 
-	// Рисуем бары объема
+	// Draw volume bars
 	barWidth = candleWidth * 0.6
 
 	for i := 0; i < len(vols) && i < len(cdls); i++ {
 		x := leftMargin + float64(i)*candleWidth + candleWidth/2.0
 
-		// Отображаем значения в пределах графика Volume
+		// Display values within the Volume chart
 		var y float64 = volTop + volHeight - (volHeight * (vols[i] - volMinVal) / (volMaxVal - volMinVal))
 		baseY := volBottom
 
-		// Цвет бара зависит от направления свечи (растущая или падающая)
+		// Color bar depends on the candle direction (rising or falling)
 		if i > 0 && cdls[i].C > cdls[i].O {
-			// Бычья свеча (зеленая)
+			// Bullish candle (green)
 			dc.SetRGB(0, 0.8, 0)
 		} else {
-			// Медвежья свеча (красная)
+			// Bearish candle (red)
 			dc.SetRGB(0.8, 0, 0)
 		}
 
@@ -897,7 +905,7 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 		dc.Fill()
 	}
 
-	// Возвращаем изображение как слайс байтов
+	// Return image as a byte slice
 	buf := bytes.NewBuffer(nil)
 	err := png.Encode(buf, dc.Image())
 	if err != nil {
@@ -906,7 +914,7 @@ func (c TAChart) GenImage(cdls []Candle) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// parseHexColor парсит HTML-цветовой код в color.RGBA
+// parseHexColor parses HTML color code to color.RGBA
 func parseHexColor(hexColor string) (color.RGBA, error) {
 	var r, g, b uint8
 	hexColor = strings.TrimPrefix(hexColor, "#")
@@ -923,7 +931,7 @@ func parseHexColor(hexColor string) (color.RGBA, error) {
 	return color.RGBA{r, g, b, 255}, nil
 }
 
-// findMinMax находит минимальное и максимальное значение в массивах
+// findMinMax finds the minimum and maximum values in arrays
 func findMinMax(arrays ...[]float64) (min, max float64) {
 	min = float64(^uint(0) >> 1) // Max value for int
 	max = -min
@@ -939,7 +947,7 @@ func findMinMax(arrays ...[]float64) (min, max float64) {
 		}
 	}
 
-	// Добавляем немного запаса для лучшего отображения
+	// Add some padding for better display
 	padding := (max - min) * 0.05
 	min -= padding
 	max += padding
@@ -947,10 +955,10 @@ func findMinMax(arrays ...[]float64) (min, max float64) {
 	return
 }
 
-// mapValueToCanvas преобразует значение из диапазона данных в координату на холсте
+// mapValueToCanvas converts a value from the data range to a coordinate on the canvas
 func mapValueToCanvas(value, min, max, canvasHeight float64) float64 {
-	// Обратите внимание, что координата Y в canvas начинается сверху,
-	// поэтому нам нужно инвертировать значение
+	// Note that the Y coordinate in canvas starts from the top,
+	// so we need to invert the value
 	return 25.0 + canvasHeight - (value-min)/(max-min)*canvasHeight
 }
 

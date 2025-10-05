@@ -40,6 +40,10 @@ More TA chart and event types will be added to support a wide-range of use cases
 ![Screen Shot 2021-06-08 at 12 04 45 PM](https://user-images.githubusercontent.com/6463139/121121350-ff88e580-c851-11eb-8857-8691c2bb7925.png)
 
 
+### In this fork 
+Added a **GenImage** method to generate an image as a byte slice.
+I’m using it on the backend of my [TradeGPT](https://chromewebstore.google.com/detail/tradegpt/jfmfkapbknjkbeipidkpknbnimniobec?hl=en) extension. The image is generated with this method and then sent to the AI for analysis.
+
 ### Usage
 
 In this example, a simple chart is created with a few lines of code. A complete code example can be found in the example folder.
@@ -85,5 +89,11 @@ func main() {
 
 	c := tachart.New(*cfg)
 	c.GenStatic(cdls, events, "/Volumes/tmpfs/tmp/kline.html")
+
+	// new method: Generate image
+	imgBuf, err := c.GenImage(cdls)
+	if err != nil {
+		return nil, fmt.Errorf("gen image: %w", err)
+	}
 }
 ```
